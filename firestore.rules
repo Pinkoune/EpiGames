@@ -1,0 +1,207 @@
+rules_version = '2';
+
+// Epigames — Firestore security rules.
+// The Firebase config (apiKey…) is public by design: these rules ARE the
+// security boundary. Written alongside the data model, kept in sync with it.
+//
+// Trust model: small trusted group, client-authoritative writes.
+// These rules prevent privilege escalation and cross-user tampering,
+// NOT sophisticated cheating by a trusted member gone rogue.
+//
+// Roles:
+// - admin (users.isAdmin): manages roles, publishes games, hard-deletes.
+// - game owner (games.ownerUids): edits their game, triages its requests.
+// Any member can SUBMIT a game; only an admin publishes it.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function me() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Role flags are read from the caller's OWN user doc — a user can never
+    // write those flags themselves (see users rules below), so this is safe.
+    function isAdmin() {
+      return signedIn() && me().isAdmin == true;
+    }
+
+    // ---------- users ----------
+    match /users/{uid} {
+      allow read: if signedIn();
+
+      // Avatar is either an emoji, a Google photo URL, or a small resized
+      // data URL stored inline — cap its size so nobody bloats their doc.
+      function avatarOk() {
+        return request.resource.data.avatar is string
+          && request.resource.data.avatar.size() < 50000;
+      }
+
+      // A user creates only their own doc, never as admin and never with
+      // pre-linked external uids.
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.isAdmin == false
+        && request.resource.data.linkedUids == []
+        && avatarOk();
+
+      // Self-edit: profile fields only. isAdmin is only ever granted by an
+      // existing admin (or the Firebase console). linkedUids is reserved for
+      // the phase-2 SSO backend (Admin SDK bypasses rules).
+      allow update: if isAdmin()
+        || (signedIn()
+            && request.auth.uid == uid
+            && avatarOk()
+            && !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['isAdmin', 'linkedUids', 'createdAt']));
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------- games ----------
+    match /games/{gameId} {
+
+      function isGameOwner() {
+        return signedIn() && request.auth.uid in resource.data.ownerUids;
+      }
+
+      // Unapproved games are readable too (small trusted group, nothing
+      // secret) — the UI hides them from non-owners; approval only gates
+      // the public listing, not read access. Keeps collection queries simple.
+      allow read: if signedIn();
+
+      // Any member can submit a game, listing themselves as owner.
+      // Non-admin submissions always start unapproved (admin publishes later).
+      allow create: if signedIn()
+        && request.auth.uid in request.resource.data.ownerUids
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.archived == false
+        && (request.resource.data.approved == false || isAdmin());
+
+      // Owners manage their game but can never flip the approval flag.
+      allow update: if isAdmin()
+        || (isGameOwner()
+            && !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['approved']));
+
+      // Hard delete is admin-only; owners archive instead.
+      allow delete: if isAdmin();
+
+      // ---------- requests (per-game bug reports / feature asks) ----------
+      // gameId '_portal' hosts the PORTAL's own bug/feature threads (forum):
+      // no parent game doc exists there, and triage is admin-only.
+      match /requests/{requestId} {
+
+        function parentGame() {
+          return get(/databases/$(database)/documents/games/$(gameId)).data;
+        }
+
+        // Owner of the PARENT game: can triage requests of their game only.
+        // No global right involved — this is the per-game moderation rule.
+        // Guard '_portal' first: its parent doc doesn't exist (get would fail).
+        function ownsParentGame() {
+          return signedIn()
+            && gameId != '_portal'
+            && request.auth.uid in parentGame().ownerUids;
+        }
+
+        function isRequestAuthor() {
+          return signedIn() && resource.data.authorUid == request.auth.uid;
+        }
+
+        // The caller only toggled their OWN upvote key, nothing else.
+        function isOwnUpvoteToggle() {
+          return signedIn()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['upvotes'])
+            && request.resource.data.upvotes.diff(resource.data.upvotes)
+                .affectedKeys().hasOnly([request.auth.uid]);
+        }
+
+        // Author edits content, and may close ("done"/"rejected") or reopen
+        // ("open") their own request, GitHub-style. Triage states (planned,
+        // in_progress) stay owner-only.
+        function isAuthorEdit() {
+          return isRequestAuthor()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['title', 'description', 'status', 'updatedAt'])
+            && request.resource.data.status in ['open', 'done', 'rejected'];
+        }
+
+        allow read: if signedIn();
+
+        // New requests start open, authored by the caller, with no votes.
+        allow create: if signedIn()
+          && request.resource.data.authorUid == request.auth.uid
+          && request.resource.data.status == 'open'
+          && request.resource.data.upvotes.size() == 0;
+
+        allow update: if isAdmin()
+          || ownsParentGame()
+          || isAuthorEdit()
+          || isOwnUpvoteToggle();
+
+        allow delete: if isAdmin() || ownsParentGame() || isRequestAuthor();
+
+        // ---------- comments ----------
+        match /comments/{commentId} {
+          allow read: if signedIn();
+          allow create: if signedIn()
+            && request.resource.data.authorUid == request.auth.uid;
+          allow update: if false;
+          allow delete: if isAdmin()
+            || (signedIn() && resource.data.authorUid == request.auth.uid)
+            || (signedIn()
+                && gameId != '_portal'
+                && request.auth.uid in
+                   get(/databases/$(database)/documents/games/$(gameId)).data.ownerUids);
+        }
+      }
+    }
+
+    // ---------- forum chats ("Général" channels) ----------
+    // scopeId = '_portal' (portal-wide) or a gameId. Flat message list.
+    match /chats/{scopeId}/messages/{messageId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.authorUid == request.auth.uid;
+      allow update: if false;
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.authorUid == request.auth.uid);
+    }
+
+    // ---------- friendships ----------
+    // Doc id is the sorted uid pair "a_b" -> at most one doc per pair,
+    // enforced below so nobody can shadow someone else's friendship.
+    match /friendships/{friendshipId} {
+
+      function involvesMe() {
+        return signedIn() && request.auth.uid in resource.data.users;
+      }
+
+      allow read: if involvesMe();
+
+      allow create: if signedIn()
+        && request.resource.data.users.size() == 2
+        && request.auth.uid in request.resource.data.users
+        && request.resource.data.requestedBy == request.auth.uid
+        && request.resource.data.status == 'pending'
+        // canonical id: sorted pair, matches the doc id
+        && request.resource.data.users[0] < request.resource.data.users[1]
+        && friendshipId == request.resource.data.users[0] + '_' + request.resource.data.users[1];
+
+      // Only the RECIPIENT can accept, and only the status field moves.
+      allow update: if involvesMe()
+        && resource.data.status == 'pending'
+        && request.auth.uid != resource.data.requestedBy
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status == 'accepted';
+
+      // Either side can decline / cancel / unfriend.
+      allow delete: if involvesMe() || isAdmin();
+    }
+  }
+}
