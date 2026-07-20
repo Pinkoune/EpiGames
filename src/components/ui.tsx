@@ -120,15 +120,17 @@ export function Avatar({
   const frame = AVATAR_FRAMES[user?.profileFrame ?? 'none'] ?? AVATAR_FRAMES.none
   return (
     <span className="relative inline-block shrink-0">
-      {frame.animated && (
+      {frame.animation === 'spin' && (
         <span
-          className="absolute -inset-[3px] animate-spin rounded-md bg-[conic-gradient(from_0deg,#3d9cff,#a78bfa,#34d399,#fbbf24,#3d9cff)]"
-          style={{ animationDuration: '3s' }}
+          className="absolute -inset-[3px] animate-spin rounded-md"
+          style={{ animationDuration: '3s', background: frame.spinBg }}
           aria-hidden
         />
       )}
       <span
-        className={`relative flex items-center justify-center overflow-hidden rounded-md border border-edge bg-panel-2 ${sizes[size]} ${frame.ringClass}`}
+        className={`relative flex items-center justify-center overflow-hidden rounded-md border border-edge bg-panel-2 ${sizes[size]} ${frame.ringClass} ${
+          frame.animation === 'pulse' ? 'animate-pulse' : ''
+        }`}
         title={user?.displayName}
       >
         {isImage ? (

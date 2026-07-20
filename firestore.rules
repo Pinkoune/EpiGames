@@ -74,6 +74,16 @@ service cloud.firestore {
                 .hasAny(['isAdmin', 'linkedUids', 'createdAt']));
 
       allow delete: if isAdmin();
+
+      // ---------- play history ----------
+      // Launch records for this user. Owner appends; anyone signed in can read
+      // (shown on profiles). Immutable once written.
+      match /plays/{playId} {
+        allow read: if signedIn();
+        allow create: if signedIn() && request.auth.uid == uid;
+        allow update: if false;
+        allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      }
     }
 
     // ---------- games ----------
@@ -172,6 +182,61 @@ service cloud.firestore {
                 && gameId != '_portal'
                 && request.auth.uid in
                    get(/databases/$(database)/documents/games/$(gameId)).data.ownerUids);
+        }
+      }
+
+      // ---------- achievements (dev-defined, admin-approved) ----------
+      // Owner of the game proposes them (pending); an admin approves/rejects.
+      // Merge-Request style: owner edits the proposal in place, both sides
+      // discuss in the comment thread, admin flips the status.
+      match /achievements/{achievementId} {
+
+        function ownsGame() {
+          return signedIn()
+            && gameId != '_portal'
+            && request.auth.uid in
+               get(/databases/$(database)/documents/games/$(gameId)).data.ownerUids;
+        }
+
+        // Only the caller's own unlock key changed, nothing else (honor unlock,
+        // allowed only once the achievement is approved).
+        function isOwnUnlockToggle() {
+          return signedIn()
+            && resource.data.status == 'approved'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unlockedBy'])
+            && request.resource.data.unlockedBy.diff(resource.data.unlockedBy)
+                .affectedKeys().hasOnly([request.auth.uid]);
+        }
+
+        // Owner edits the proposal content in place (never the status/unlocks).
+        function isOwnerContentEdit() {
+          return ownsGame()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['icon', 'title', 'description', 'updatedAt']);
+        }
+
+        allow read: if signedIn();
+
+        // New proposals start pending, authored by an owner, with no unlocks.
+        allow create: if ownsGame()
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.status == 'pending'
+          && request.resource.data.unlockedBy.size() == 0;
+
+        // Admin does anything (incl. status); owner edits content; anyone
+        // toggles their own unlock on an approved achievement.
+        allow update: if isAdmin() || isOwnerContentEdit() || isOwnUnlockToggle();
+
+        allow delete: if isAdmin() || ownsGame();
+
+        match /comments/{commentId} {
+          allow read: if signedIn();
+          allow create: if signedIn()
+            && request.resource.data.authorUid == request.auth.uid;
+          allow update: if false;
+          allow delete: if isAdmin()
+            || (signedIn() && resource.data.authorUid == request.auth.uid)
+            || ownsGame();
         }
       }
     }

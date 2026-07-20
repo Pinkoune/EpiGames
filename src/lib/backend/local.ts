@@ -1,8 +1,11 @@
 import type {
+  AchievementStatus,
   ChatMessage,
   Friendship,
   Game,
+  GameAchievement,
   GameRequest,
+  PlayEntry,
   PlayingStatus,
   PresenceInfo,
   RequestComment,
@@ -10,7 +13,13 @@ import type {
   UserProfile,
 } from '../types'
 import { friendshipId, normalizeGame, normalizeUser } from '../types'
-import type { Backend, NewGameInput, NewRequestInput, Unsubscribe } from './types'
+import type {
+  Backend,
+  NewAchievementInput,
+  NewGameInput,
+  NewRequestInput,
+  Unsubscribe,
+} from './types'
 
 /**
  * Full localStorage implementation of the Backend contract.
@@ -40,6 +49,12 @@ interface LocalDb {
   /** scopeId (PORTAL_SCOPE | gameId) -> chat messages */
   chats: Record<string, ChatMessage[]>
   friendships: Friendship[]
+  /** uid -> launch history (most recent first, capped). */
+  plays: Record<string, PlayEntry[]>
+  /** gameId -> dev-defined achievements */
+  achievements: Record<string, GameAchievement[]>
+  /** `${gameId}/${achievementId}` -> review-thread comments */
+  achievementComments: Record<string, RequestComment[]>
 }
 
 const EMPTY_DB: LocalDb = {
@@ -49,7 +64,12 @@ const EMPTY_DB: LocalDb = {
   comments: {},
   chats: {},
   friendships: [],
+  plays: {},
+  achievements: {},
+  achievementComments: {},
 }
+
+const PLAYS_CAP = 50
 
 function loadDb(): LocalDb {
   try {
@@ -283,8 +303,12 @@ export class LocalBackend implements Backend {
       db.games = db.games.filter((g) => g.id !== gameId)
       delete db.requests[gameId]
       delete db.chats[gameId]
+      delete db.achievements[gameId]
       for (const key of Object.keys(db.comments)) {
         if (key.startsWith(`${gameId}/`)) delete db.comments[key]
+      }
+      for (const key of Object.keys(db.achievementComments)) {
+        if (key.startsWith(`${gameId}/`)) delete db.achievementComments[key]
       }
     })
   }
@@ -496,6 +520,145 @@ export class LocalBackend implements Backend {
     this.mutatePresence((p) => {
       const prev = p[uidTarget] ?? { online: true, lastSeen: Date.now(), playing: null }
       p[uidTarget] = { ...prev, lastSeen: Date.now(), playing }
+    })
+    if (playing) await this.logPlay(uidTarget, playing.gameId, playing.title)
+  }
+
+  // ---- play history ----
+
+  async logPlay(uidTarget: string, gameId: string, title: string): Promise<void> {
+    this.mutate((db) => {
+      const list = db.plays[uidTarget] ?? (db.plays[uidTarget] = [])
+      list.unshift({ id: uid('play'), gameId, title, at: Date.now() })
+      db.plays[uidTarget] = list.slice(0, PLAYS_CAP)
+    })
+  }
+
+  watchPlays(uidTarget: string, cb: (plays: PlayEntry[]) => void): Unsubscribe {
+    return this.subscribe(() => cb([...(loadDb().plays[uidTarget] ?? [])]))
+  }
+
+  // ---- game achievements ----
+
+  watchAchievements(
+    gameId: string,
+    cb: (achievements: GameAchievement[]) => void,
+  ): Unsubscribe {
+    return this.subscribe(() =>
+      cb([...(loadDb().achievements[gameId] ?? [])].sort((a, b) => a.createdAt - b.createdAt)),
+    )
+  }
+
+  async addAchievement(
+    gameId: string,
+    input: NewAchievementInput,
+    createdBy: string,
+  ): Promise<string> {
+    const id = uid('ach')
+    const now = Date.now()
+    this.mutate((db) => {
+      const list = db.achievements[gameId] ?? (db.achievements[gameId] = [])
+      list.push({
+        ...input,
+        id,
+        gameId,
+        status: 'pending',
+        unlockedBy: {},
+        createdBy,
+        createdAt: now,
+        updatedAt: now,
+      })
+    })
+    return id
+  }
+
+  private mutateAchievement(
+    gameId: string,
+    achievementId: string,
+    fn: (a: GameAchievement) => void,
+  ) {
+    this.mutate((db) => {
+      const a = (db.achievements[gameId] ?? []).find((x) => x.id === achievementId)
+      if (a) {
+        fn(a)
+        a.updatedAt = Date.now()
+      }
+    })
+  }
+
+  async updateAchievementContent(
+    gameId: string,
+    achievementId: string,
+    patch: NewAchievementInput,
+  ): Promise<void> {
+    this.mutateAchievement(gameId, achievementId, (a) => Object.assign(a, patch))
+  }
+
+  async setAchievementStatus(
+    gameId: string,
+    achievementId: string,
+    status: AchievementStatus,
+  ): Promise<void> {
+    this.mutateAchievement(gameId, achievementId, (a) => {
+      a.status = status
+    })
+  }
+
+  async toggleAchievementUnlock(
+    gameId: string,
+    achievementId: string,
+    uidTarget: string,
+    on: boolean,
+  ): Promise<void> {
+    this.mutateAchievement(gameId, achievementId, (a) => {
+      if (on) a.unlockedBy[uidTarget] = true
+      else delete a.unlockedBy[uidTarget]
+    })
+  }
+
+  async deleteAchievement(gameId: string, achievementId: string): Promise<void> {
+    this.mutate((db) => {
+      db.achievements[gameId] = (db.achievements[gameId] ?? []).filter(
+        (a) => a.id !== achievementId,
+      )
+      delete db.achievementComments[`${gameId}/${achievementId}`]
+    })
+  }
+
+  watchAchievementComments(
+    gameId: string,
+    achievementId: string,
+    cb: (comments: RequestComment[]) => void,
+  ): Unsubscribe {
+    const key = `${gameId}/${achievementId}`
+    return this.subscribe(() =>
+      cb([...(loadDb().achievementComments[key] ?? [])].sort((a, b) => a.createdAt - b.createdAt)),
+    )
+  }
+
+  async addAchievementComment(
+    gameId: string,
+    achievementId: string,
+    authorUid: string,
+    text: string,
+  ): Promise<void> {
+    const key = `${gameId}/${achievementId}`
+    this.mutate((db) => {
+      const list = db.achievementComments[key] ?? (db.achievementComments[key] = [])
+      list.push({ id: uid('com'), authorUid, text, createdAt: Date.now() })
+    })
+  }
+
+  async deleteAchievementComment(
+    gameId: string,
+    achievementId: string,
+    commentId: string,
+  ): Promise<void> {
+    const key = `${gameId}/${achievementId}`
+    this.mutate((db) => {
+      db.achievementComments[key] = (db.achievementComments[key] ?? []).filter(
+        (c) => c.id !== commentId,
+      )
     })
   }
 }

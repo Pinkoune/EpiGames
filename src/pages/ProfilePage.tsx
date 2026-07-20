@@ -7,13 +7,28 @@ import { Avatar, SectionLabel, btnGhost, btnPrimary } from '../components/ui'
 import { backend } from '../lib/backend'
 import { useChatMap, useRequestsMap } from '../lib/hooks'
 import { resolveProfileBackground } from '../lib/profileCustomization'
-import type { Friendship } from '../lib/types'
+import { computeMetaAchievements } from '../lib/achievements'
+import type { Friendship, PlayEntry } from '../lib/types'
 import { PORTAL_SCOPE, friendshipId, isRequestClosed } from '../lib/types'
 import { useAuthStore } from '../stores/authStore'
 import { useFriendsStore } from '../stores/friendsStore'
 import { canSeeGame, useGamesStore } from '../stores/gamesStore'
 import { usePresenceStore } from '../stores/presenceStore'
 import { useUsersStore } from '../stores/usersStore'
+
+/** Compact FR relative time ("il y a 3 h", "hier", "il y a 5 j"). */
+function relativeTime(ts: number): string {
+  const diff = Date.now() - ts
+  const min = Math.floor(diff / 60_000)
+  if (min < 1) return "à l'instant"
+  if (min < 60) return `il y a ${min} min`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `il y a ${h} h`
+  const d = Math.floor(h / 24)
+  if (d === 1) return 'hier'
+  if (d < 30) return `il y a ${d} j`
+  return new Date(ts).toLocaleDateString('fr-FR')
+}
 
 function StatTile({ value, label }: { value: number | string; label: string }) {
   return (
@@ -36,6 +51,7 @@ export function ProfilePage() {
   const [editing, setEditing] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [theirFriendships, setTheirFriendships] = useState<Friendship[]>([])
+  const [plays, setPlays] = useState<PlayEntry[]>([])
 
   const profile = uid ? users[uid] : undefined
   const isSelf = Boolean(me && uid && me.uid === uid)
@@ -45,6 +61,13 @@ export function ProfilePage() {
     if (!uid) return
     setTheirFriendships([])
     return backend.watchFriendships(uid, setTheirFriendships)
+  }, [uid])
+
+  // Recent launch history of the viewed profile.
+  useEffect(() => {
+    if (!uid) return
+    setPlays([])
+    return backend.watchPlays(uid, setPlays)
   }, [uid])
 
   const scopeIds = useMemo(
@@ -84,18 +107,31 @@ export function ProfilePage() {
     .filter((m) => m.authorUid === uid).length
   const friendsCount = theirFriendships.filter((f) => f.status === 'accepted').length
 
+  const achievements = computeMetaAchievements({
+    publishedGames: publishedCount,
+    bugsReported: theirRequests.filter((r) => r.type === 'bug').length,
+    featuresReported: theirRequests.filter((r) => r.type === 'feature').length,
+    upvotesReceived,
+    friends: friendsCount,
+    messages: messagesSent,
+    distinctGamesPlayed: new Set(plays.map((p) => p.gameId)).size,
+    totalPlays: plays.length,
+  }).sort((a, b) => Number(b.earned) - Number(a.earned))
+  const earnedCount = achievements.filter((a) => a.earned).length
+
   const relation = me ? myFriendships.find((f) => f.id === friendshipId(me.uid, uid)) : undefined
 
   const backgroundCss = resolveProfileBackground(profile.profileBackground)
 
   return (
     <div className="mx-auto max-w-4xl">
-      {/* Custom profile banner (Steam-style), purely decorative */}
+      {/* Steam-style: the chosen background themes the whole profile page.
+          Fixed layer behind the content (-z-10), dimmed for readability. */}
       {backgroundCss && (
-        <div
-          className="mb-4 h-32 rounded-lg border border-edge sm:h-40"
-          style={{ background: backgroundCss }}
-        />
+        <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden>
+          <div className="absolute inset-0" style={{ background: backgroundCss }} />
+          <div className="absolute inset-0 bg-gradient-to-b from-abyss/70 via-abyss/85 to-abyss" />
+        </div>
       )}
 
       {/* Header */}
@@ -166,6 +202,38 @@ export function ProfilePage() {
         <StatTile value={friendsCount} label="amis" />
       </div>
 
+      {/* Achievements — portal meta-badges, computed live from the data above */}
+      <section className="mt-8">
+        <SectionLabel>
+          Succès ({earnedCount}/{achievements.length})
+        </SectionLabel>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {achievements.map(({ def, value, earned }) => (
+            <div
+              key={def.id}
+              title={def.description}
+              className={`flex items-center gap-3 rounded-lg border p-3 transition ${
+                earned
+                  ? 'border-amber-500/30 bg-amber-500/5'
+                  : 'border-edge bg-panel opacity-60'
+              }`}
+            >
+              <span className={`text-2xl ${earned ? '' : 'grayscale'}`}>{def.icon}</span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">{def.title}</p>
+                {earned ? (
+                  <p className="truncate text-xs text-amber-400/90">Débloqué</p>
+                ) : (
+                  <p className="truncate text-xs text-ink-dim">
+                    {Math.min(value, def.goal)} / {def.goal}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Their games */}
       <section className="mt-8">
         <SectionLabel>
@@ -185,6 +253,31 @@ export function ProfilePage() {
           </div>
         )}
       </section>
+
+      {/* Play history — recent launches (accurate for embedded, declared for the rest) */}
+      {plays.length > 0 && (
+        <section className="mt-8">
+          <SectionLabel>Parties récentes</SectionLabel>
+          <div className="space-y-1.5">
+            {plays.slice(0, 8).map((play) => {
+              const game = games.find((g) => g.id === play.gameId)
+              return (
+                <Link
+                  key={play.id}
+                  to={`/game/${play.gameId}`}
+                  className="flex items-center gap-2 rounded-md border border-edge bg-panel px-3 py-2 text-sm transition hover:border-edge-2"
+                >
+                  <span className="text-emerald-400">🎮</span>
+                  <span className="truncate">{game?.title ?? play.title}</span>
+                  <span className="ml-auto shrink-0 text-xs text-ink-dim">
+                    {relativeTime(play.at)}
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Recent activity: their latest open requests */}
       {theirRequests.length > 0 && (

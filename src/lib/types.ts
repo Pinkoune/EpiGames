@@ -127,6 +127,34 @@ export interface RequestComment {
   createdAt: number
 }
 
+export type AchievementStatus = 'pending' | 'approved' | 'rejected'
+
+/**
+ * A dev-defined achievement for a game, reviewed by admins Merge-Request style:
+ * the owner proposes it (status 'pending'), admins discuss it in the comment
+ * thread and the owner can edit the proposal in place, until an admin approves
+ * or rejects it. Once 'approved' it becomes an official achievement of the game
+ * that players unlock on the honor system (`unlockedBy`, like request upvotes).
+ */
+export interface GameAchievement {
+  id: string
+  gameId: string
+  icon: string
+  title: string
+  description: string
+  status: AchievementStatus
+  /** uid -> true. Members toggle only their own key (honor unlock). */
+  unlockedBy: Record<string, true>
+  createdBy: string
+  createdAt: number
+  updatedAt: number
+}
+
+/** GitHub-style: an achievement proposal is "closed" once approved or rejected. */
+export function isAchievementReviewed(status: AchievementStatus): boolean {
+  return status === 'approved' || status === 'rejected'
+}
+
 export interface Friendship {
   /** Deterministic id: sorted pair "uidA_uidB" -> one doc max per pair. */
   id: string
@@ -140,6 +168,19 @@ export interface PlayingStatus {
   gameId: string
   title: string
   since: number
+}
+
+/**
+ * One "I launched a game" record — logged at launch time (a moment we
+ * control), so history stays accurate even when a session ends by the tab
+ * simply closing (which runs no client code). Duration is deliberately not
+ * tracked: it can't be captured reliably for external games.
+ */
+export interface PlayEntry {
+  id: string
+  gameId: string
+  title: string
+  at: number
 }
 
 export interface PresenceInfo {

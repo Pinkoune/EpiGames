@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Logo } from '../Logo'
 import { backend } from '../../lib/backend'
+import { usePresenceAutoAway } from '../../lib/usePresenceAutoAway'
 import { useAuthStore } from '../../stores/authStore'
 import { useFriendsStore, friendUidsOf, pendingIncoming } from '../../stores/friendsStore'
 import { useGamesStore } from '../../stores/gamesStore'
 import { usePresenceStore } from '../../stores/presenceStore'
 import { ProfileEditor } from '../auth/ProfileEditor'
+import { NotificationsBell } from './NotificationsBell'
 import { Avatar } from '../ui'
 
 const navCls = ({ isActive }: { isActive: boolean }) =>
@@ -25,6 +27,9 @@ export function Shell() {
 
   const presence = usePresenceStore((s) => s.presence)
   const setPlaying = usePresenceStore((s) => s.setPlaying)
+
+  // Self-correcting "en jeu": clears the status on prolonged inactivity.
+  usePresenceAutoAway(user?.uid)
 
   const myPlaying = user ? (presence[user.uid]?.playing ?? null) : null
   const playableGames = games.filter((g) => g.approved && !g.archived && g.status === 'live')
@@ -87,6 +92,7 @@ export function Shell() {
                 LOCAL
               </span>
             )}
+            <NotificationsBell />
             <div className="relative">
               <button
                 onClick={() => setMenuOpen((v) => !v)}

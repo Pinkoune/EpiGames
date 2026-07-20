@@ -1,8 +1,11 @@
 import type {
+  AchievementStatus,
   ChatMessage,
   Friendship,
   Game,
+  GameAchievement,
   GameRequest,
+  PlayEntry,
   PlayingStatus,
   PresenceInfo,
   RequestComment,
@@ -29,6 +32,12 @@ export interface NewGameInput {
 
 export interface NewRequestInput {
   type: GameRequest['type']
+  title: string
+  description: string
+}
+
+export interface NewAchievementInput {
+  icon: string
   title: string
   description: string
 }
@@ -116,4 +125,53 @@ export interface Backend {
   goOnline(uid: string): void
   goOffline(uid: string): void
   setPlaying(uid: string, playing: PlayingStatus | null): Promise<void>
+
+  // ---- play history ----
+  /** Append a launch record for `uid` (called when a game is launched). */
+  logPlay(uid: string, gameId: string, title: string): Promise<void>
+  /** Most recent launches first (capped). */
+  watchPlays(uid: string, cb: (plays: PlayEntry[]) => void): Unsubscribe
+
+  // ---- game achievements (dev-defined, admin-approved, honor-unlocked) ----
+  watchAchievements(gameId: string, cb: (achievements: GameAchievement[]) => void): Unsubscribe
+  /** Owner proposes an achievement — always starts 'pending'. */
+  addAchievement(gameId: string, input: NewAchievementInput, createdBy: string): Promise<string>
+  /** Owner edits the proposal in place (icon/title/description). */
+  updateAchievementContent(
+    gameId: string,
+    achievementId: string,
+    patch: NewAchievementInput,
+  ): Promise<void>
+  /** Admin approves/rejects the proposal (or reopens it). */
+  setAchievementStatus(
+    gameId: string,
+    achievementId: string,
+    status: AchievementStatus,
+  ): Promise<void>
+  /** Honor unlock: a member toggles their own key on an approved achievement. */
+  toggleAchievementUnlock(
+    gameId: string,
+    achievementId: string,
+    uid: string,
+    on: boolean,
+  ): Promise<void>
+  deleteAchievement(gameId: string, achievementId: string): Promise<void>
+
+  // Review thread on a proposal (admins + owner discuss).
+  watchAchievementComments(
+    gameId: string,
+    achievementId: string,
+    cb: (comments: RequestComment[]) => void,
+  ): Unsubscribe
+  addAchievementComment(
+    gameId: string,
+    achievementId: string,
+    authorUid: string,
+    text: string,
+  ): Promise<void>
+  deleteAchievementComment(
+    gameId: string,
+    achievementId: string,
+    commentId: string,
+  ): Promise<void>
 }
