@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { GameStatus, RequestStatus, UserProfile } from '../lib/types'
 import { GAME_STATUS_LABELS, REQUEST_STATUS_LABELS } from '../lib/types'
+import { AVATAR_FRAMES } from '../lib/profileCustomization'
 
 export function Modal({
   title,
@@ -106,18 +107,28 @@ export function Avatar({
   size = 'md',
   online,
 }: {
-  user: Pick<UserProfile, 'avatar' | 'displayName'> | undefined
+  // Widened (not just avatar/displayName) so any full UserProfile passed in
+  // automatically renders its chosen frame, with zero changes at call sites.
+  user: (Pick<UserProfile, 'avatar' | 'displayName'> & Partial<Pick<UserProfile, 'profileFrame'>>) | undefined
   size?: 'sm' | 'md' | 'lg'
   online?: boolean
 }) {
   const sizes = { sm: 'h-7 w-7 text-sm', md: 'h-9 w-9 text-lg', lg: 'h-16 w-16 text-3xl' }
   const avatar = user?.avatar || '👤'
-  // Real picture (Google photoURL or resized custom upload) vs emoji.
+  // Real picture (Google photoURL, external URL/GIF, or resized custom upload) vs emoji.
   const isImage = avatar.startsWith('http') || avatar.startsWith('data:image/')
+  const frame = AVATAR_FRAMES[user?.profileFrame ?? 'none'] ?? AVATAR_FRAMES.none
   return (
     <span className="relative inline-block shrink-0">
+      {frame.animated && (
+        <span
+          className="absolute -inset-[3px] animate-spin rounded-md bg-[conic-gradient(from_0deg,#3d9cff,#a78bfa,#34d399,#fbbf24,#3d9cff)]"
+          style={{ animationDuration: '3s' }}
+          aria-hidden
+        />
+      )}
       <span
-        className={`flex items-center justify-center overflow-hidden rounded-md border border-edge bg-panel-2 ${sizes[size]}`}
+        className={`relative flex items-center justify-center overflow-hidden rounded-md border border-edge bg-panel-2 ${sizes[size]} ${frame.ringClass}`}
         title={user?.displayName}
       >
         {isImage ? (

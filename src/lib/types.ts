@@ -28,6 +28,13 @@ export interface UserProfile {
    * project) that map back to this Epigames account. Always [] in phase 1.
    */
   linkedUids: string[]
+  /** Avatar ring preset id (see lib/profileCustomization.ts), 'none' = plain. */
+  profileFrame: string
+  /**
+   * Profile page banner: a preset id (see lib/profileCustomization.ts) or,
+   * like avatar/coverUrl, a direct image URL pasted by the user.
+   */
+  profileBackground: string
 }
 
 /** Announcement a game owner publishes when they ship an update. */
@@ -194,6 +201,8 @@ export function normalizeUser(raw: Partial<UserProfile> & { uid: string }): User
     createdAt: 0,
     seenUpdates: {},
     linkedUids: [],
+    profileFrame: 'none',
+    profileBackground: 'none',
     ...raw,
   }
 }

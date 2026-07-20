@@ -1,5 +1,11 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { useAuthStore } from '../../stores/authStore'
+import {
+  AVATAR_FRAMES,
+  PROFILE_BACKGROUNDS,
+  isCustomBackground,
+  resolveProfileBackground,
+} from '../../lib/profileCustomization'
 import { Avatar, Modal, btnGhost, btnPrimary, inputCls } from '../ui'
 
 const AVATARS = ['🎮', '🕹️', '👾', '🤖', '🐉', '🦊', '🐸', '🧙', '🥷', '🚀', '⚔️', '🎲']
@@ -48,7 +54,17 @@ export function ProfileEditor({ onClose }: { onClose: () => void }) {
   const { user, updateProfile } = useAuthStore()
   const [displayName, setDisplayName] = useState(user?.displayName ?? '')
   const [avatar, setAvatar] = useState(user?.avatar ?? '🎮')
+  const [avatarUrl, setAvatarUrl] = useState(
+    user?.avatar?.startsWith('http') ? user.avatar : '',
+  )
   const [bio, setBio] = useState(user?.bio ?? '')
+  const [frame, setFrame] = useState(user?.profileFrame ?? 'none')
+  const [background, setBackground] = useState(user?.profileBackground ?? 'none')
+  const [backgroundUrl, setBackgroundUrl] = useState(
+    user?.profileBackground && isCustomBackground(user.profileBackground)
+      ? user.profileBackground
+      : '',
+  )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -67,7 +83,14 @@ export function ProfileEditor({ onClose }: { onClose: () => void }) {
     e.preventDefault()
     setBusy(true)
     try {
-      await updateProfile({ displayName: displayName.trim(), avatar, bio: bio.trim() })
+      await updateProfile({
+        displayName: displayName.trim(),
+        avatar,
+        bio: bio.trim(),
+        profileFrame: frame,
+        // A custom URL always wins over the preset picker below it.
+        profileBackground: backgroundUrl.trim() || background,
+      })
       onClose()
     } finally {
       setBusy(false)
@@ -128,7 +151,78 @@ export function ProfileEditor({ onClose }: { onClose: () => void }) {
               </button>
             ))}
           </div>
+          <div className="mt-2 flex gap-2">
+            <input
+              className={`${inputCls} text-sm`}
+              type="url"
+              placeholder="…ou une URL d'image / GIF animé"
+              value={avatarUrl}
+              onChange={(e) => setAvatarUrl(e.target.value)}
+            />
+            <button
+              type="button"
+              onClick={() => avatarUrl.trim() && setAvatar(avatarUrl.trim())}
+              className={`${btnGhost} shrink-0 px-3 py-1.5 text-xs`}
+            >
+              Utiliser
+            </button>
+          </div>
           {error && <p className="mt-1 text-sm text-rose-400">{error}</p>}
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm text-ink-dim">Contour de l'avatar</label>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(AVATAR_FRAMES).map(([id, f]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setFrame(id)}
+                title={f.label}
+                className={`rounded-md p-1 transition ${
+                  frame === id ? 'bg-accent/15 outline outline-1 outline-accent' : 'hover:bg-panel-2'
+                }`}
+              >
+                <Avatar user={{ avatar, displayName, profileFrame: id }} size="sm" />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm text-ink-dim">Fond de profil</label>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(PROFILE_BACKGROUNDS).map(([id, b]) => (
+              <button
+                key={id}
+                type="button"
+                title={b.label}
+                onClick={() => {
+                  setBackground(id)
+                  setBackgroundUrl('')
+                }}
+                className={`h-10 w-14 rounded-md border transition ${
+                  background === id && !backgroundUrl
+                    ? 'border-accent'
+                    : 'border-edge hover:border-edge-2'
+                }`}
+                style={{ background: b.css || 'var(--color-panel-2)' }}
+              />
+            ))}
+          </div>
+          <input
+            className={`${inputCls} mt-2 text-sm`}
+            type="url"
+            placeholder="…ou une image personnalisée (URL)"
+            value={backgroundUrl}
+            onChange={(e) => setBackgroundUrl(e.target.value)}
+          />
+          {(backgroundUrl.trim() || background !== 'none') && (
+            <div
+              className="mt-2 h-16 rounded-md border border-edge"
+              style={{ background: resolveProfileBackground(backgroundUrl.trim() || background) }}
+            />
+          )}
         </div>
 
         <div>

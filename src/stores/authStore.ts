@@ -14,7 +14,9 @@ interface AuthState {
   signInLocal: (displayName: string) => Promise<void>
   signOut: () => Promise<void>
   updateProfile: (
-    patch: Partial<Pick<UserProfile, 'displayName' | 'avatar' | 'bio'>>,
+    patch: Partial<
+      Pick<UserProfile, 'displayName' | 'avatar' | 'bio' | 'profileFrame' | 'profileBackground'>
+    >,
   ) => Promise<void>
   clearError: () => void
 }

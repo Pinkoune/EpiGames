@@ -6,6 +6,7 @@ import { GameCard } from '../components/library/GameCard'
 import { Avatar, SectionLabel, btnGhost, btnPrimary } from '../components/ui'
 import { backend } from '../lib/backend'
 import { useChatMap, useRequestsMap } from '../lib/hooks'
+import { resolveProfileBackground } from '../lib/profileCustomization'
 import type { Friendship } from '../lib/types'
 import { PORTAL_SCOPE, friendshipId, isRequestClosed } from '../lib/types'
 import { useAuthStore } from '../stores/authStore'
@@ -85,8 +86,18 @@ export function ProfilePage() {
 
   const relation = me ? myFriendships.find((f) => f.id === friendshipId(me.uid, uid)) : undefined
 
+  const backgroundCss = resolveProfileBackground(profile.profileBackground)
+
   return (
     <div className="mx-auto max-w-4xl">
+      {/* Custom profile banner (Steam-style), purely decorative */}
+      {backgroundCss && (
+        <div
+          className="mb-4 h-32 rounded-lg border border-edge sm:h-40"
+          style={{ background: backgroundCss }}
+        />
+      )}
+
       {/* Header */}
       <div className="flex flex-wrap items-start gap-5 rounded-lg border border-edge bg-panel p-6">
         <Avatar user={profile} size="lg" online={p?.online ?? false} />

@@ -41,13 +41,27 @@ service cloud.firestore {
           && request.resource.data.avatar.size() < 50000;
       }
 
+      // Profile personalization fields are optional (legacy docs may lack
+      // them until their next edit) — cap them when present.
+      function profileFrameOk() {
+        return !('profileFrame' in request.resource.data)
+          || (request.resource.data.profileFrame is string
+              && request.resource.data.profileFrame.size() < 40);
+      }
+
+      function profileBackgroundOk() {
+        return !('profileBackground' in request.resource.data)
+          || (request.resource.data.profileBackground is string
+              && request.resource.data.profileBackground.size() < 2000);
+      }
+
       // A user creates only their own doc, never as admin and never with
       // pre-linked external uids.
       allow create: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.isAdmin == false
         && request.resource.data.linkedUids == []
-        && avatarOk();
+        && avatarOk() && profileFrameOk() && profileBackgroundOk();
 
       // Self-edit: profile fields only. isAdmin is only ever granted by an
       // existing admin (or the Firebase console). linkedUids is reserved for
@@ -55,7 +69,7 @@ service cloud.firestore {
       allow update: if isAdmin()
         || (signedIn()
             && request.auth.uid == uid
-            && avatarOk()
+            && avatarOk() && profileFrameOk() && profileBackgroundOk()
             && !request.resource.data.diff(resource.data).affectedKeys()
                 .hasAny(['isAdmin', 'linkedUids', 'createdAt']));
 
