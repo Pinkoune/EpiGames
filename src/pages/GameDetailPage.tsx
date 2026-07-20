@@ -117,6 +117,14 @@ export function GameDetailPage() {
   const openCount = requests.filter((r) => !isRequestClosed(r.status)).length
   const closedCount = requests.length - openCount
 
+  // Close the embedded play zone (with confirmation) and drop the "en jeu"
+  // status. Shared by the sidebar "Quitter" button and the toolbar one.
+  const quitGame = () => {
+    if (!confirm('Quitter le jeu ? La partie en cours sera fermée.')) return
+    setEmbedRunning(false)
+    if (user) void backend.setPlaying(user.uid, null)
+  }
+
   return (
     <div>
       <Link to="/" className="text-sm text-ink-dim transition hover:text-ink">
@@ -170,48 +178,52 @@ export function GameDetailPage() {
         </div>
       </div>
 
+      {/* Embedded games play in-page, itch.io style. The zone only opens on
+          ▶ Jouer, and lives OUTSIDE the 2-column grid so it spans the full
+          page width (much wider than the main column). */}
+      {game.kind === 'embedded' && game.launchUrl && embedRunning && (
+        <section className="mt-6">
+          <div className="overflow-hidden rounded-lg border border-emerald-500/30 bg-black">
+            {/*
+              No `sandbox` on purpose: it's the one thing that differs from the
+              official itch.io embed snippet, and providers like itch load the
+              game in a NESTED iframe whose loader frame-busts when the outer
+              frame is sandboxed (→ "itch.io n'autorise pas la connexion").
+              Acceptable here — trusted small group, games added by known devs.
+            */}
+            <iframe
+              src={game.launchUrl}
+              title={game.title}
+              className="h-[78vh] min-h-[460px] w-full"
+              allow="fullscreen; autoplay; gamepad; clipboard-write"
+              allowFullScreen
+            />
+            <div className="flex items-center justify-between gap-3 border-t border-edge bg-panel px-3 py-2 text-xs text-ink-dim">
+              <span>▶ En jeu — {game.title}</span>
+              <div className="flex items-center gap-3">
+                <a
+                  href={game.launchUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent hover:underline"
+                >
+                  Plein écran ↗
+                </a>
+                <button
+                  onClick={quitGame}
+                  className="font-semibold text-rose-400 transition hover:text-rose-300"
+                >
+                  ✕ Quitter le jeu
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_280px]">
         {/* Main column */}
         <div className="min-w-0">
-          {/* Embedded games play in-page, itch.io style — but the zone only
-              opens (and takes real space) once you press ▶ Jouer. */}
-          {game.kind === 'embedded' && game.launchUrl && embedRunning && (
-            <section className="mb-8">
-              <div className="overflow-hidden rounded-lg border border-emerald-500/30 bg-black">
-                <iframe
-                  src={game.launchUrl}
-                  title={game.title}
-                  className="h-[72vh] min-h-[420px] w-full"
-                  allow="fullscreen; autoplay; gamepad; clipboard-write"
-                  allowFullScreen
-                  sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals allow-downloads allow-presentation"
-                />
-                <div className="flex items-center justify-between gap-3 border-t border-edge bg-panel px-3 py-2 text-xs text-ink-dim">
-                  <span>▶ En jeu — {game.title}</span>
-                  <div className="flex items-center gap-3">
-                    <a
-                      href={game.launchUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-accent hover:underline"
-                    >
-                      Plein écran ↗
-                    </a>
-                    <button
-                      onClick={() => {
-                        setEmbedRunning(false)
-                        if (user) void backend.setPlaying(user.uid, null)
-                      }}
-                      className="font-semibold transition hover:text-ink"
-                    >
-                      ✕ Fermer
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </section>
-          )}
-
           {/* Update announcement sits ABOVE the description — it's news. */}
           {game.update && (
             <section className="mb-8 rounded-lg border border-accent/35 bg-accent/5 p-5">
@@ -392,20 +404,25 @@ export function GameDetailPage() {
 
             {game.kind === 'embedded' && game.launchUrl && (
               <>
-                <button
-                  onClick={() => {
-                    // Launch (post "en jeu" + open the zone) only on the first
-                    // click; later clicks just bring the open zone into view.
-                    if (!embedRunning) {
+                {embedRunning ? (
+                  <button
+                    onClick={quitGame}
+                    className="w-full rounded-md bg-rose-900 py-3 text-base font-semibold text-rose-100 transition hover:bg-rose-800"
+                  >
+                    ✕ Quitter le jeu
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
                       setEmbedRunning(true)
                       void launchGame(user?.uid, game)
-                    }
-                    window.scrollTo({ top: 0, behavior: 'smooth' })
-                  }}
-                  className={`${btnPlay} w-full py-3 text-base`}
-                >
-                  {embedRunning ? '▶ Reprendre' : '▶ Jouer'}
-                </button>
+                      window.scrollTo({ top: 0, behavior: 'smooth' })
+                    }}
+                    className={`${btnPlay} w-full py-3 text-base`}
+                  >
+                    ▶ Jouer
+                  </button>
+                )}
                 {/* Optional download button, right below "Jouer". */}
                 {game.downloadUrl && (
                   <a
