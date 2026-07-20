@@ -173,49 +173,42 @@ export function GameDetailPage() {
       <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_280px]">
         {/* Main column */}
         <div className="min-w-0">
-          {/* Embedded games play right here, itch.io style. */}
-          {game.kind === 'embedded' && game.launchUrl && (
+          {/* Embedded games play in-page, itch.io style — but the zone only
+              opens (and takes real space) once you press ▶ Jouer. */}
+          {game.kind === 'embedded' && game.launchUrl && embedRunning && (
             <section className="mb-8">
-              {embedRunning ? (
-                <div className="overflow-hidden rounded-lg border border-emerald-500/30 bg-black">
-                  <iframe
-                    src={game.launchUrl}
-                    title={game.title}
-                    className="aspect-video w-full"
-                    allow="fullscreen; autoplay; gamepad; clipboard-write"
-                    sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-popups allow-forms"
-                  />
-                  <div className="flex items-center justify-between gap-3 border-t border-edge bg-panel px-3 py-2 text-xs text-ink-dim">
-                    <span>▶ En jeu — {game.title}</span>
+              <div className="overflow-hidden rounded-lg border border-emerald-500/30 bg-black">
+                <iframe
+                  src={game.launchUrl}
+                  title={game.title}
+                  className="h-[72vh] min-h-[420px] w-full"
+                  allow="fullscreen; autoplay; gamepad; clipboard-write"
+                  allowFullScreen
+                  sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals allow-downloads allow-presentation"
+                />
+                <div className="flex items-center justify-between gap-3 border-t border-edge bg-panel px-3 py-2 text-xs text-ink-dim">
+                  <span>▶ En jeu — {game.title}</span>
+                  <div className="flex items-center gap-3">
                     <a
                       href={game.launchUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-accent hover:underline"
                     >
-                      Ouvrir en plein écran ↗
+                      Plein écran ↗
                     </a>
+                    <button
+                      onClick={() => {
+                        setEmbedRunning(false)
+                        if (user) void backend.setPlaying(user.uid, null)
+                      }}
+                      className="font-semibold transition hover:text-ink"
+                    >
+                      ✕ Fermer
+                    </button>
                   </div>
                 </div>
-              ) : (
-                <button
-                  onClick={() => {
-                    setEmbedRunning(true)
-                    void launchGame(user?.uid, game)
-                  }}
-                  className="group relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg border border-emerald-500/30 bg-cover bg-center"
-                  style={
-                    game.coverUrl
-                      ? { backgroundImage: `url(${game.coverUrl})` }
-                      : { background: coverFallback(game.id) }
-                  }
-                >
-                  <span className="absolute inset-0 bg-black/40 transition group-hover:bg-black/30" />
-                  <span className="relative flex items-center gap-2 rounded-md bg-emerald-500 px-6 py-3 text-lg font-bold text-white shadow-lg transition group-hover:bg-emerald-400">
-                    ▶ Jouer
-                  </span>
-                </button>
-              )}
+              </div>
             </section>
           )}
 
@@ -401,13 +394,17 @@ export function GameDetailPage() {
               <>
                 <button
                   onClick={() => {
-                    setEmbedRunning(true)
-                    void launchGame(user?.uid, game)
+                    // Launch (post "en jeu" + open the zone) only on the first
+                    // click; later clicks just bring the open zone into view.
+                    if (!embedRunning) {
+                      setEmbedRunning(true)
+                      void launchGame(user?.uid, game)
+                    }
                     window.scrollTo({ top: 0, behavior: 'smooth' })
                   }}
                   className={`${btnPlay} w-full py-3 text-base`}
                 >
-                  ▶ Jouer
+                  {embedRunning ? '▶ Reprendre' : '▶ Jouer'}
                 </button>
                 {/* Optional download button, right below "Jouer". */}
                 {game.downloadUrl && (
