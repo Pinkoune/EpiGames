@@ -83,12 +83,15 @@ friendships/{a_b}    id = paire uid triée, users[2], requestedBy, status(pendin
   « Télécharger » et ne poste PAS de statut « joue à » (déclaration manuelle
   depuis la page du jeu).
 - `kind: 'embedded'` = jeu jouable DIRECTEMENT sur le portail (façon itch.io) :
-  `launchUrl` est chargée dans une iframe sur la page du jeu (le site doit
-  autoriser l'intégration). Identité VERTE (ruban « ▶ JOUABLE ICI », bouton
-  Jouer vert). Le bouton ▶ Jouer poste le statut « joue à » sans ouvrir
-  d'onglet. `downloadUrl` (optionnel) ajoute un bouton « Télécharger » juste
-  sous le bouton Jouer. Le bouton Jouer des jeux web est aussi vert (façon
-  Steam) ; seul le bouton Télécharger reste violet.
+  `launchUrl` doit être une URL d'**intégration** (beaucoup de sites bloquent
+  le framing de leur page publique via X-Frame-Options/CSP — ex. itch.io :
+  Embed options → `https://itch.io/embed-upload/…`, PAS l'URL du jeu). La zone
+  de jeu (iframe ~72vh) ne s'ouvre qu'au clic sur ▶ Jouer (état `embedRunning`
+  local à la page), avec un bouton « Fermer » ; par défaut la page reste
+  normale. Identité VERTE (ruban « ▶ JOUABLE ICI », bouton Jouer vert). Le
+  bouton ▶ Jouer poste le statut « joue à » sans ouvrir d'onglet. `downloadUrl`
+  (optionnel) ajoute un bouton « Télécharger » sous le bouton Jouer. Le bouton
+  Jouer des jeux web est aussi vert (façon Steam) ; seul Télécharger reste violet.
 - **Workflow de publication** : un dev soumet un jeu → `approved: false`, listé
   uniquement pour ses owners + admins (filtre UI `canSeeGame`, la lecture
   Firestore reste ouverte aux membres — rien de secret, ça garde les requêtes
