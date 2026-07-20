@@ -43,11 +43,14 @@ sinon local. Config via `.env` (voir `.env.example`).
 ### Modèle de données Firestore
 
 ```
-users/{uid}          displayName, avatar (emoji | URL Google | data URL 128px),
-                     bio, isAdmin, createdAt, seenUpdates{gameId:ts}, linkedUids
+users/{uid}          displayName, avatar (emoji | URL Google | data URL 128px | URL externe/GIF),
+                     bio, isAdmin, createdAt, seenUpdates{gameId:ts}, linkedUids,
+                     profileFrame (preset contour d'avatar), profileBackground
+                     (preset ou URL — bannière de la page profil)
 games/{gameId}       title, tagline, description (longue, page façon itch.io),
-                     kind(web|download), coverUrl, screenshots[], launchUrl, repoUrl,
-                     status(live|dev|planned|paused), tags[], ownerUids[],
+                     kind(web|download|embedded), coverUrl, screenshots[], launchUrl,
+                     downloadUrl (bouton téléchargement optionnel des jeux embedded),
+                     repoUrl, status(live|dev|planned|paused), tags[], ownerUids[],
                      update{version,text,publishedAt}|null,
                      approved, archived, createdBy, createdAt, updatedAt
   requests/{id}      type(bug|feature), title, description,
@@ -73,6 +76,13 @@ friendships/{a_b}    id = paire uid triée, users[2], requestedBy, status(pendin
   vers la page de téléchargement (releases GitHub) ; le bouton devient
   « Télécharger » et ne poste PAS de statut « joue à » (déclaration manuelle
   depuis la page du jeu).
+- `kind: 'embedded'` = jeu jouable DIRECTEMENT sur le portail (façon itch.io) :
+  `launchUrl` est chargée dans une iframe sur la page du jeu (le site doit
+  autoriser l'intégration). Identité VERTE (ruban « ▶ JOUABLE ICI », bouton
+  Jouer vert). Le bouton ▶ Jouer poste le statut « joue à » sans ouvrir
+  d'onglet. `downloadUrl` (optionnel) ajoute un bouton « Télécharger » juste
+  sous le bouton Jouer. Le bouton Jouer des jeux web est aussi vert (façon
+  Steam) ; seul le bouton Télécharger reste violet.
 - **Workflow de publication** : un dev soumet un jeu → `approved: false`, listé
   uniquement pour ses owners + admins (filtre UI `canSeeGame`, la lecture
   Firestore reste ouverte aux membres — rien de secret, ça garde les requêtes
@@ -88,10 +98,21 @@ friendships/{a_b}    id = paire uid triée, users[2], requestedBy, status(pendin
   `users.seenUpdates[gameId] < update.publishedAt` ; bouton « J'ai vu » →
   `backend.setSeenUpdate`. Pas de collection dédiée : volontairement une seule
   annonce à la fois, pas un changelog.
-- **Avatars** : emoji, photo Google (`photoURL` repris à la création du compte)
-  ou image importée — recadrée/réduite côté client (128px JPEG, data URL
-  < 40 k caractères) et stockée dans le doc user ; les règles plafonnent le
-  champ à 50 000 octets. Pas de Firebase Storage.
+- **Avatars** : emoji, photo Google (`photoURL` repris à la création du compte),
+  image importée — recadrée/réduite côté client (128px JPEG, data URL
+  < 40 k caractères) — ou URL externe collée telle quelle (permet les GIF
+  animés, le `<img>` ne repasse jamais par le canvas dans ce cas) ; stockée
+  dans le doc user, les règles plafonnent le champ à 50 000 octets. Pas de
+  Firebase Storage.
+- **Personnalisation de profil** (`lib/profileCustomization.ts`, façon Steam) :
+  `profileFrame` choisit un contour d'avatar parmi un set de presets CSS
+  (accent, or, émeraude, violet, rose, ou un anneau animé « prisma ») —
+  appliqué automatiquement partout où `Avatar` reçoit un `UserProfile`
+  complet (le composant lit `profileFrame` s'il est présent, aucun site
+  d'appel à modifier). `profileBackground` choisit une bannière (preset
+  dégradé ou URL personnalisée, même logique polymorphe que `avatar`),
+  affichée en haut de la page profil. Presets volontairement fermés (pas de
+  CSS arbitraire) ; règles Firestore plafonnent la taille des deux champs.
 - Champs ajoutés après coup : `normalizeGame` / `normalizeUser` (types.ts)
   appliquent les défauts aux anciens docs — docs legacy sans `approved` sont
   traités comme publiés.

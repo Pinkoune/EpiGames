@@ -20,6 +20,7 @@ export interface NewGameInput {
   screenshots: string[]
   kind: Game['kind']
   launchUrl: string
+  downloadUrl: string
   repoUrl: string
   status: Game['status']
   tags: string[]
@@ -51,7 +52,9 @@ export interface Backend {
   signOut(): Promise<void>
   updateProfile(
     uid: string,
-    patch: Partial<Pick<UserProfile, 'displayName' | 'avatar' | 'bio'>>,
+    patch: Partial<
+      Pick<UserProfile, 'displayName' | 'avatar' | 'bio' | 'profileFrame' | 'profileBackground'>
+    >,
   ): Promise<void>
   /** Dismiss a game's update announcement ("j'ai vu") for this user. */
   setSeenUpdate(uid: string, gameId: string, publishedAt: number): Promise<void>

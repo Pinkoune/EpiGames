@@ -178,6 +178,8 @@ export class LocalBackend implements Backend {
           createdAt: Date.now(),
           seenUpdates: {},
           linkedUids: [],
+          profileFrame: 'none',
+          profileBackground: 'none',
         })
       }
     })
@@ -194,7 +196,9 @@ export class LocalBackend implements Backend {
 
   async updateProfile(
     targetUid: string,
-    patch: Partial<Pick<UserProfile, 'displayName' | 'avatar' | 'bio'>>,
+    patch: Partial<
+      Pick<UserProfile, 'displayName' | 'avatar' | 'bio' | 'profileFrame' | 'profileBackground'>
+    >,
   ): Promise<void> {
     this.mutate((db) => {
       const u = db.users.find((x) => x.uid === targetUid)

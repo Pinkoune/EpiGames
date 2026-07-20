@@ -13,6 +13,7 @@ import {
   SectionLabel,
   btnDanger,
   btnGhost,
+  btnPlay,
   btnPrimary,
 } from '../components/ui'
 import { useRequests } from '../lib/hooks'
@@ -48,6 +49,8 @@ export function GameDetailPage() {
   const [statusFilter, setStatusFilter] = useState<Filter>('open_like')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [lightbox, setLightbox] = useState<string | null>(null)
+  // Embedded games: whether the in-page iframe has been launched.
+  const [embedRunning, setEmbedRunning] = useState(false)
 
   const game = games.find((g) => g.id === gameId)
 
@@ -125,6 +128,11 @@ export function GameDetailPage() {
               {game.title}
             </h1>
             <GameStatusBadge status={game.status} />
+            {game.kind === 'embedded' && (
+              <span className="inline-flex items-center gap-1 rounded bg-emerald-500/90 px-1.5 py-0.5 text-[11px] font-bold tracking-wide text-white">
+                ▶ JOUABLE ICI
+              </span>
+            )}
             {game.archived && (
               <span className="rounded bg-zinc-700/80 px-1.5 py-0.5 text-[11px] font-semibold text-zinc-300">
                 ARCHIVÉ
@@ -138,6 +146,52 @@ export function GameDetailPage() {
       <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_280px]">
         {/* Main column */}
         <div className="min-w-0">
+          {/* Embedded games play right here, itch.io style. */}
+          {game.kind === 'embedded' && game.launchUrl && (
+            <section className="mb-8">
+              {embedRunning ? (
+                <div className="overflow-hidden rounded-lg border border-emerald-500/30 bg-black">
+                  <iframe
+                    src={game.launchUrl}
+                    title={game.title}
+                    className="aspect-video w-full"
+                    allow="fullscreen; autoplay; gamepad; clipboard-write"
+                    sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-popups allow-forms"
+                  />
+                  <div className="flex items-center justify-between gap-3 border-t border-edge bg-panel px-3 py-2 text-xs text-ink-dim">
+                    <span>▶ En jeu — {game.title}</span>
+                    <a
+                      href={game.launchUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-accent hover:underline"
+                    >
+                      Ouvrir en plein écran ↗
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setEmbedRunning(true)
+                    void launchGame(user?.uid, game)
+                  }}
+                  className="group relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg border border-emerald-500/30 bg-cover bg-center"
+                  style={
+                    game.coverUrl
+                      ? { backgroundImage: `url(${game.coverUrl})` }
+                      : { background: coverFallback(game.id) }
+                  }
+                >
+                  <span className="absolute inset-0 bg-black/40 transition group-hover:bg-black/30" />
+                  <span className="relative flex items-center gap-2 rounded-md bg-emerald-500 px-6 py-3 text-lg font-bold text-white shadow-lg transition group-hover:bg-emerald-400">
+                    ▶ Jouer
+                  </span>
+                </button>
+              )}
+            </section>
+          )}
+
           {/* Update announcement sits ABOVE the description — it's news. */}
           {game.update && (
             <section className="mb-8 rounded-lg border border-accent/35 bg-accent/5 p-5">
@@ -254,22 +308,49 @@ export function GameDetailPage() {
         {/* Sidebar */}
         <aside className="space-y-6">
           <div className="space-y-2">
-            {game.launchUrl &&
-              (game.kind === 'download' ? (
+            {game.kind === 'download' && game.launchUrl && (
+              <button
+                onClick={() => void launchGame(user?.uid, game)}
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-violet-500 py-3 text-base font-semibold text-white transition hover:bg-violet-400"
+              >
+                <DownloadIcon /> Télécharger
+              </button>
+            )}
+
+            {game.kind === 'web' && game.launchUrl && (
+              <button
+                onClick={() => void launchGame(user?.uid, game)}
+                className={`${btnPlay} w-full py-3 text-base`}
+              >
+                ▶ Jouer
+              </button>
+            )}
+
+            {game.kind === 'embedded' && game.launchUrl && (
+              <>
                 <button
-                  onClick={() => void launchGame(user?.uid, game)}
-                  className="flex w-full items-center justify-center gap-2 rounded-md bg-violet-500 py-3 text-base font-semibold text-white transition hover:bg-violet-400"
-                >
-                  <DownloadIcon /> Télécharger
-                </button>
-              ) : (
-                <button
-                  onClick={() => void launchGame(user?.uid, game)}
-                  className={`${btnPrimary} w-full py-3 text-base`}
+                  onClick={() => {
+                    setEmbedRunning(true)
+                    void launchGame(user?.uid, game)
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}
+                  className={`${btnPlay} w-full py-3 text-base`}
                 >
                   ▶ Jouer
                 </button>
-              ))}
+                {/* Optional download button, right below "Jouer". */}
+                {game.downloadUrl && (
+                  <a
+                    href={game.downloadUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-full items-center justify-center gap-2 rounded-md border border-violet-500/40 py-2.5 text-sm font-semibold text-violet-300 transition hover:bg-violet-500/10"
+                  >
+                    <DownloadIcon /> Télécharger
+                  </a>
+                )}
+              </>
+            )}
           </div>
 
           {game.kind === 'download' && (
@@ -280,6 +361,17 @@ export function GameDetailPage() {
                 page de téléchargement{game.repoUrl ? ' (releases du dépôt)' : ''}.
                 Quand tu y joues, signale-le via ton menu profil (en haut à
                 droite) — tes amis le verront.
+              </p>
+            </div>
+          )}
+
+          {game.kind === 'embedded' && (
+            <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-4 text-sm">
+              <p className="mb-1 font-semibold text-emerald-300">Jouable sur le portail</p>
+              <p className="text-ink-dim">
+                Ce jeu se lance directement ici, sans rien installer : clique sur
+                « Jouer » et il s'ouvre dans la page. Tes amis verront que tu y
+                joues.
               </p>
             </div>
           )}

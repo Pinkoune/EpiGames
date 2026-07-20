@@ -18,6 +18,7 @@ const SECTIONS: { status: GameStatus; title: string; hint?: string }[] = [
 
 const KIND_FILTERS: { value: GameKind | 'all'; label: ReactNode }[] = [
   { value: 'all', label: 'Tous' },
+  { value: 'embedded', label: '▶ Sur le portail' },
   { value: 'web', label: '🌐 Jouables en ligne' },
   {
     value: 'download',

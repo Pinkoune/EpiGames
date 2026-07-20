@@ -24,13 +24,16 @@ export function GameCard({
 
   const creator = users[game.createdBy]?.displayName
   const download = game.kind === 'download'
+  const embedded = game.kind === 'embedded'
 
   return (
     <div
       className={`group relative overflow-hidden rounded-lg border bg-panel transition ${
         download
           ? 'border-violet-500/25 hover:border-violet-400/60'
-          : 'border-edge hover:border-accent/50'
+          : embedded
+            ? 'border-emerald-500/25 hover:border-emerald-400/60'
+            : 'border-edge hover:border-accent/50'
       }`}
     >
       <Link to={`/game/${game.id}`} className="block">
@@ -51,6 +54,12 @@ export function GameCard({
           {download && (
             <span className="absolute top-0 right-0 flex items-center gap-1 rounded-bl-lg bg-violet-500/90 px-2 py-1 text-[11px] font-bold tracking-wide text-white">
               <DownloadIcon /> À INSTALLER
+            </span>
+          )}
+          {/* Embedded games play on the portal: emerald ribbon */}
+          {embedded && (
+            <span className="absolute top-0 right-0 rounded-bl-lg bg-emerald-500/90 px-2 py-1 text-[11px] font-bold tracking-wide text-white">
+              ▶ JOUABLE ICI
             </span>
           )}
           {!game.approved && (
@@ -116,27 +125,38 @@ export function GameCard({
         </div>
       )}
 
-      {game.launchUrl && (
-        <button
-          onClick={() => void launchGame(user?.uid, game)}
-          className={`absolute top-2 right-2 rounded-md px-3 py-1 text-sm font-bold text-white opacity-0 shadow-lg transition group-hover:opacity-100 ${
-            download ? 'top-8 bg-violet-500 hover:bg-violet-400' : 'bg-accent text-abyss'
-          }`}
-          title={
-            download
-              ? 'Ouvre la page de téléchargement'
-              : 'Ouvre le jeu et signale aux amis que tu y joues'
-          }
-        >
-          {download ? (
-            <>
-              <DownloadIcon /> Obtenir
-            </>
-          ) : (
-            '▶ Jouer'
-          )}
-        </button>
-      )}
+      {game.launchUrl &&
+        (embedded ? (
+          <Link
+            to={`/game/${game.id}`}
+            className="absolute top-8 right-2 rounded-md bg-emerald-500 px-3 py-1 text-sm font-bold text-white opacity-0 shadow-lg transition hover:bg-emerald-400 group-hover:opacity-100"
+            title="Jouer directement sur le portail"
+          >
+            ▶ Jouer
+          </Link>
+        ) : (
+          <button
+            onClick={() => void launchGame(user?.uid, game)}
+            className={`absolute top-2 right-2 rounded-md px-3 py-1 text-sm font-bold text-white opacity-0 shadow-lg transition group-hover:opacity-100 ${
+              download
+                ? 'top-8 bg-violet-500 hover:bg-violet-400'
+                : 'bg-emerald-500 hover:bg-emerald-400'
+            }`}
+            title={
+              download
+                ? 'Ouvre la page de téléchargement'
+                : 'Ouvre le jeu et signale aux amis que tu y joues'
+            }
+          >
+            {download ? (
+              <>
+                <DownloadIcon /> Obtenir
+              </>
+            ) : (
+              '▶ Jouer'
+            )}
+          </button>
+        ))}
     </div>
   )
 }

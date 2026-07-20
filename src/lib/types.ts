@@ -1,5 +1,5 @@
 export type GameStatus = 'live' | 'dev' | 'planned' | 'paused'
-export type GameKind = 'web' | 'download'
+export type GameKind = 'web' | 'download' | 'embedded'
 export type RequestType = 'bug' | 'feature'
 export type RequestStatus = 'open' | 'planned' | 'in_progress' | 'done' | 'rejected'
 export type FriendshipStatus = 'pending' | 'accepted'
@@ -28,6 +28,13 @@ export interface UserProfile {
    * project) that map back to this Epigames account. Always [] in phase 1.
    */
   linkedUids: string[]
+  /** Avatar ring preset id (see lib/profileCustomization.ts), 'none' = plain. */
+  profileFrame: string
+  /**
+   * Profile page banner: a preset id (see lib/profileCustomization.ts) or,
+   * like avatar/coverUrl, a direct image URL pasted by the user.
+   */
+  profileBackground: string
 }
 
 /** Announcement a game owner publishes when they ship an update. */
@@ -49,13 +56,20 @@ export interface Game {
   /** Screenshot image URLs for the game page gallery. */
   screenshots: string[]
   /**
-   * web: hosted game, "Jouer" opens launchUrl.
+   * web: hosted game, "Jouer" opens launchUrl in a new tab.
    * download: installable (e.g. Chrome extension), "Télécharger" opens
    * launchUrl (typically a GitHub releases page).
+   * embedded: playable directly on the portal — launchUrl is loaded in an
+   * iframe (itch.io style). An optional downloadUrl adds a download button.
    */
   kind: GameKind
-  /** External launch or download URL — the portal never hosts games. */
+  /** External launch / embed / download URL — the portal never hosts games. */
   launchUrl: string
+  /**
+   * Optional download link shown BELOW the play button for embedded games
+   * (the dev may let players grab a standalone build). Empty = no button.
+   */
+  downloadUrl: string
   /** Source repository URL (optional). */
   repoUrl: string
   status: GameStatus
@@ -162,6 +176,7 @@ export function normalizeGame(raw: Partial<Game> & { id: string }): Game {
     screenshots: [],
     kind: 'web',
     launchUrl: '',
+    downloadUrl: '',
     repoUrl: '',
     status: 'dev',
     tags: [],
@@ -186,6 +201,8 @@ export function normalizeUser(raw: Partial<UserProfile> & { uid: string }): User
     createdAt: 0,
     seenUpdates: {},
     linkedUids: [],
+    profileFrame: 'none',
+    profileBackground: 'none',
     ...raw,
   }
 }
@@ -200,6 +217,7 @@ export const GAME_STATUS_LABELS: Record<GameStatus, string> = {
 export const GAME_KIND_LABELS: Record<GameKind, string> = {
   web: 'Jeu web',
   download: 'Téléchargeable',
+  embedded: 'Jouable sur le portail',
 }
 
 export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {

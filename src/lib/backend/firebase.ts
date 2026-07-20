@@ -100,6 +100,8 @@ export class FirebaseBackend implements Backend {
       createdAt: Date.now(),
       seenUpdates: {},
       linkedUids: [],
+      profileFrame: 'none',
+      profileBackground: 'none',
     }
     await setDoc(userRef, profile)
   }
@@ -119,6 +121,8 @@ export class FirebaseBackend implements Backend {
       createdAt: Date.now(),
       seenUpdates: {},
       linkedUids: [],
+      profileFrame: 'none',
+      profileBackground: 'none',
     }
     await setDoc(userRef, profile)
   }
@@ -139,7 +143,9 @@ export class FirebaseBackend implements Backend {
 
   async updateProfile(
     uid: string,
-    patch: Partial<Pick<UserProfile, 'displayName' | 'avatar' | 'bio'>>,
+    patch: Partial<
+      Pick<UserProfile, 'displayName' | 'avatar' | 'bio' | 'profileFrame' | 'profileBackground'>
+    >,
   ): Promise<void> {
     await updateDoc(doc(this.db, 'users', uid), patch)
   }

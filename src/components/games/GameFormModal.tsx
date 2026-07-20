@@ -21,6 +21,7 @@ export function GameFormModal({ game, onClose }: { game?: Game; onClose: () => v
   const [coverUrl, setCoverUrl] = useState(game?.coverUrl ?? '')
   const [screenshotsRaw, setScreenshotsRaw] = useState(game?.screenshots.join('\n') ?? '')
   const [launchUrl, setLaunchUrl] = useState(game?.launchUrl ?? '')
+  const [downloadUrl, setDownloadUrl] = useState(game?.downloadUrl ?? '')
   const [repoUrl, setRepoUrl] = useState(game?.repoUrl ?? '')
   const [status, setStatus] = useState<GameStatus>(game?.status ?? 'dev')
   const [tagsRaw, setTagsRaw] = useState(game?.tags.join(', ') ?? '')
@@ -57,6 +58,8 @@ export function GameFormModal({ game, onClose }: { game?: Game; onClose: () => v
         .map((s) => s.trim())
         .filter(Boolean),
       launchUrl: launchUrl.trim(),
+      // Download button below "Jouer" is embedded-only.
+      downloadUrl: kind === 'embedded' ? downloadUrl.trim() : '',
       repoUrl: repoUrl.trim(),
       status,
       tags: tagsRaw
@@ -139,23 +142,35 @@ export function GameFormModal({ game, onClose }: { game?: Game; onClose: () => v
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm text-ink-dim">
-              {kind === 'download' ? 'URL de téléchargement *' : 'URL de lancement'}
+              {kind === 'download'
+                ? 'URL de téléchargement *'
+                : kind === 'embedded'
+                  ? 'URL du jeu à intégrer *'
+                  : 'URL de lancement'}
             </label>
             <input
               className={inputCls}
               type="url"
               value={launchUrl}
               onChange={(e) => setLaunchUrl(e.target.value)}
-              required={kind === 'download'}
+              required={kind === 'download' || kind === 'embedded'}
               placeholder={
                 kind === 'download'
                   ? 'https://github.com/…/releases'
-                  : 'https://mon-jeu.example.com'
+                  : kind === 'embedded'
+                    ? 'https://mon-jeu.example.com (chargé dans une iframe)'
+                    : 'https://mon-jeu.example.com'
               }
             />
             {kind === 'download' && (
               <p className="mt-1 text-xs text-ink-dim/70">
                 Ex. la page releases GitHub d'une extension Chrome.
+              </p>
+            )}
+            {kind === 'embedded' && (
+              <p className="mt-1 text-xs text-ink-dim/70">
+                Le jeu se lancera directement sur le portail (iframe). Le site
+                doit autoriser l'intégration (pas de X-Frame-Options: DENY).
               </p>
             )}
           </div>
@@ -170,6 +185,24 @@ export function GameFormModal({ game, onClose }: { game?: Game; onClose: () => v
             />
           </div>
         </div>
+
+        {kind === 'embedded' && (
+          <div>
+            <label className="mb-1 block text-sm text-ink-dim">
+              URL de téléchargement (optionnel)
+            </label>
+            <input
+              className={inputCls}
+              type="url"
+              value={downloadUrl}
+              onChange={(e) => setDownloadUrl(e.target.value)}
+              placeholder="https://github.com/…/releases"
+            />
+            <p className="mt-1 text-xs text-ink-dim/70">
+              Ajoute un bouton « Télécharger » sous le bouton « Jouer ».
+            </p>
+          </div>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>

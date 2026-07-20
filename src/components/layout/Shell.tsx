@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { Logo } from '../Logo'
 import { backend } from '../../lib/backend'
 import { useAuthStore } from '../../stores/authStore'
 import { useFriendsStore, friendUidsOf, pendingIncoming } from '../../stores/friendsStore'
@@ -38,8 +39,8 @@ export function Shell() {
     <div className="bp-bg flex min-h-full flex-col">
       <header className="sticky top-0 z-40 border-b border-edge bg-abyss/90 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4">
-          <NavLink to="/" className="font-display text-lg font-bold tracking-tight">
-            EPI<span className="text-accent">GAMES</span>
+          <NavLink to="/">
+            <Logo size="sm" />
           </NavLink>
 
           <nav className="flex h-full items-center gap-1">

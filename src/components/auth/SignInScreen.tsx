@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { backend } from '../../lib/backend'
 import { useAuthStore } from '../../stores/authStore'
+import { Logo } from '../Logo'
 import { btnGhost, btnPrimary, inputCls } from '../ui'
 
 type Tab = 'signin' | 'signup'
@@ -32,10 +33,8 @@ export function SignInScreen() {
   return (
     <div className="bp-bg flex min-h-full items-center justify-center p-4">
       <div className="w-full max-w-sm">
-        <div className="mb-10 text-center">
-          <h1 className="font-display text-5xl font-bold tracking-tight">
-            EPI<span className="text-accent">GAMES</span>
-          </h1>
+        <div className="mb-10 flex flex-col items-center text-center">
+          <Logo size="lg" />
           <p className="mt-3 text-sm text-ink-dim">
             Les jeux du groupe. Un seul endroit.
           </p>
