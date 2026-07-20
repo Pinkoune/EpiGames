@@ -148,6 +148,10 @@ export const inputCls =
 export const btnPrimary =
   'rounded-md bg-accent px-4 py-2 text-sm font-semibold text-abyss transition hover:brightness-115 disabled:opacity-50 disabled:hover:brightness-100'
 
+/** Steam-style green "Jouer" button (web + embedded games). */
+export const btnPlay =
+  'inline-flex items-center justify-center gap-2 rounded-md bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400 disabled:opacity-50'
+
 export const btnGhost =
   'rounded-md border border-edge px-4 py-2 text-sm font-medium text-ink transition hover:border-edge-2 hover:bg-panel-2 disabled:opacity-50'
 

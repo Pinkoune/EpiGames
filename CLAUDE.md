@@ -46,8 +46,9 @@ sinon local. Config via `.env` (voir `.env.example`).
 users/{uid}          displayName, avatar (emoji | URL Google | data URL 128px),
                      bio, isAdmin, createdAt, seenUpdates{gameId:ts}, linkedUids
 games/{gameId}       title, tagline, description (longue, page façon itch.io),
-                     kind(web|download), coverUrl, screenshots[], launchUrl, repoUrl,
-                     status(live|dev|planned|paused), tags[], ownerUids[],
+                     kind(web|download|embedded), coverUrl, screenshots[], launchUrl,
+                     downloadUrl (bouton téléchargement optionnel des jeux embedded),
+                     repoUrl, status(live|dev|planned|paused), tags[], ownerUids[],
                      update{version,text,publishedAt}|null,
                      approved, archived, createdBy, createdAt, updatedAt
   requests/{id}      type(bug|feature), title, description,
@@ -73,6 +74,13 @@ friendships/{a_b}    id = paire uid triée, users[2], requestedBy, status(pendin
   vers la page de téléchargement (releases GitHub) ; le bouton devient
   « Télécharger » et ne poste PAS de statut « joue à » (déclaration manuelle
   depuis la page du jeu).
+- `kind: 'embedded'` = jeu jouable DIRECTEMENT sur le portail (façon itch.io) :
+  `launchUrl` est chargée dans une iframe sur la page du jeu (le site doit
+  autoriser l'intégration). Identité VERTE (ruban « ▶ JOUABLE ICI », bouton
+  Jouer vert). Le bouton ▶ Jouer poste le statut « joue à » sans ouvrir
+  d'onglet. `downloadUrl` (optionnel) ajoute un bouton « Télécharger » juste
+  sous le bouton Jouer. Le bouton Jouer des jeux web est aussi vert (façon
+  Steam) ; seul le bouton Télécharger reste violet.
 - **Workflow de publication** : un dev soumet un jeu → `approved: false`, listé
   uniquement pour ses owners + admins (filtre UI `canSeeGame`, la lecture
   Firestore reste ouverte aux membres — rien de secret, ça garde les requêtes

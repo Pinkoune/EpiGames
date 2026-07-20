@@ -20,6 +20,7 @@ export interface NewGameInput {
   screenshots: string[]
   kind: Game['kind']
   launchUrl: string
+  downloadUrl: string
   repoUrl: string
   status: Game['status']
   tags: string[]

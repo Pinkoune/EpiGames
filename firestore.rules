@@ -182,7 +182,11 @@ service cloud.firestore {
         return signedIn() && request.auth.uid in resource.data.users;
       }
 
-      allow read: if involvesMe();
+      // A signed-in user may read a pair doc they're part of — and also a
+      // NON-EXISTENT one (resource == null), so the existence check in
+      // sendFriendRequest doesn't hit "insufficient permissions" before the
+      // friendship is created. A missing doc leaks nothing.
+      allow read: if signedIn() && (resource == null || involvesMe());
 
       allow create: if signedIn()
         && request.resource.data.users.size() == 2
