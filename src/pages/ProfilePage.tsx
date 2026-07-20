@@ -7,6 +7,7 @@ import { Avatar, SectionLabel, btnGhost, btnPrimary } from '../components/ui'
 import { backend } from '../lib/backend'
 import { useChatMap, useRequestsMap } from '../lib/hooks'
 import { resolveProfileBackground } from '../lib/profileCustomization'
+import { computeMetaAchievements } from '../lib/achievements'
 import type { Friendship, PlayEntry } from '../lib/types'
 import { PORTAL_SCOPE, friendshipId, isRequestClosed } from '../lib/types'
 import { useAuthStore } from '../stores/authStore'
@@ -106,6 +107,18 @@ export function ProfilePage() {
     .filter((m) => m.authorUid === uid).length
   const friendsCount = theirFriendships.filter((f) => f.status === 'accepted').length
 
+  const achievements = computeMetaAchievements({
+    publishedGames: publishedCount,
+    bugsReported: theirRequests.filter((r) => r.type === 'bug').length,
+    featuresReported: theirRequests.filter((r) => r.type === 'feature').length,
+    upvotesReceived,
+    friends: friendsCount,
+    messages: messagesSent,
+    distinctGamesPlayed: new Set(plays.map((p) => p.gameId)).size,
+    totalPlays: plays.length,
+  }).sort((a, b) => Number(b.earned) - Number(a.earned))
+  const earnedCount = achievements.filter((a) => a.earned).length
+
   const relation = me ? myFriendships.find((f) => f.id === friendshipId(me.uid, uid)) : undefined
 
   const backgroundCss = resolveProfileBackground(profile.profileBackground)
@@ -188,6 +201,38 @@ export function ProfilePage() {
         <StatTile value={upvotesReceived} label="upvotes reçus" />
         <StatTile value={friendsCount} label="amis" />
       </div>
+
+      {/* Achievements — portal meta-badges, computed live from the data above */}
+      <section className="mt-8">
+        <SectionLabel>
+          Succès ({earnedCount}/{achievements.length})
+        </SectionLabel>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {achievements.map(({ def, value, earned }) => (
+            <div
+              key={def.id}
+              title={def.description}
+              className={`flex items-center gap-3 rounded-lg border p-3 transition ${
+                earned
+                  ? 'border-amber-500/30 bg-amber-500/5'
+                  : 'border-edge bg-panel opacity-60'
+              }`}
+            >
+              <span className={`text-2xl ${earned ? '' : 'grayscale'}`}>{def.icon}</span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">{def.title}</p>
+                {earned ? (
+                  <p className="truncate text-xs text-amber-400/90">Débloqué</p>
+                ) : (
+                  <p className="truncate text-xs text-ink-dim">
+                    {Math.min(value, def.goal)} / {def.goal}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Their games */}
       <section className="mt-8">

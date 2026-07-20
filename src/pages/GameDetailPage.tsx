@@ -2,6 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { GameFormModal } from '../components/games/GameFormModal'
 import { GameUpdateModal } from '../components/games/GameUpdateModal'
+import { AchievementFormModal } from '../components/games/AchievementFormModal'
+import {
+  AchievementBadge,
+  AchievementReviewCard,
+} from '../components/games/AchievementCard'
 import { Markdown } from '../components/Markdown'
 import { coverFallback } from '../lib/cover'
 import { RequestCard } from '../components/requests/RequestCard'
@@ -16,7 +21,7 @@ import {
   btnPlay,
   btnPrimary,
 } from '../components/ui'
-import { useRequests } from '../lib/hooks'
+import { useAchievements, useRequests } from '../lib/hooks'
 import type { RequestStatus } from '../lib/types'
 import {
   GAME_KIND_LABELS,
@@ -42,10 +47,12 @@ export function GameDetailPage() {
   const presence = usePresenceStore((s) => s.presence)
   const launchGame = usePresenceStore((s) => s.launchGame)
   const requests = useRequests(gameId)
+  const achievements = useAchievements(gameId)
 
   const [editing, setEditing] = useState(false)
   const [announcing, setAnnouncing] = useState(false)
   const [addingRequest, setAddingRequest] = useState(false)
+  const [proposingAchievement, setProposingAchievement] = useState(false)
   const [statusFilter, setStatusFilter] = useState<Filter>('open_like')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [lightbox, setLightbox] = useState<string | null>(null)
@@ -261,6 +268,50 @@ export function GameDetailPage() {
               </div>
             </section>
           )}
+
+          {/* Achievements (dev-defined, admin-approved) */}
+          {(() => {
+            const approved = achievements.filter((a) => a.status === 'approved')
+            const reviewable = achievements.filter((a) => a.status !== 'approved')
+            if (approved.length === 0 && !isOwner) return null
+            return (
+              <section className="mb-8">
+                <div className="mb-3 flex items-center gap-3">
+                  <SectionLabel>Succès du jeu</SectionLabel>
+                  {isOwner && (
+                    <button
+                      onClick={() => setProposingAchievement(true)}
+                      className={`${btnGhost} -mt-3 ml-auto px-2.5 py-1 text-xs`}
+                    >
+                      + Proposer un succès
+                    </button>
+                  )}
+                </div>
+                {approved.length > 0 && (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {approved.map((a) => (
+                      <AchievementBadge key={a.id} achievement={a} />
+                    ))}
+                  </div>
+                )}
+                {isOwner && reviewable.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs tracking-wide text-ink-dim uppercase">
+                      En validation
+                    </p>
+                    {reviewable.map((a) => (
+                      <AchievementReviewCard key={a.id} achievement={a} />
+                    ))}
+                  </div>
+                )}
+                {approved.length === 0 && reviewable.length === 0 && isOwner && (
+                  <p className="rounded-lg border border-dashed border-edge py-6 text-center text-sm text-ink-dim">
+                    Propose des succès pour ton jeu — un admin les validera.
+                  </p>
+                )}
+              </section>
+            )
+          })()}
 
           {/* Requests */}
           <section>
@@ -539,6 +590,12 @@ export function GameDetailPage() {
       {announcing && <GameUpdateModal game={game} onClose={() => setAnnouncing(false)} />}
       {addingRequest && (
         <RequestForm gameId={game.id} onClose={() => setAddingRequest(false)} />
+      )}
+      {proposingAchievement && (
+        <AchievementFormModal
+          gameId={game.id}
+          onClose={() => setProposingAchievement(false)}
+        />
       )}
     </div>
   )

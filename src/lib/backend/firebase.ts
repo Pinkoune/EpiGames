@@ -35,9 +35,11 @@ import {
   update,
 } from 'firebase/database'
 import type {
+  AchievementStatus,
   ChatMessage,
   Friendship,
   Game,
+  GameAchievement,
   GameRequest,
   PlayEntry,
   PlayingStatus,
@@ -47,7 +49,13 @@ import type {
   UserProfile,
 } from '../types'
 import { friendshipId, normalizeGame, normalizeUser } from '../types'
-import type { Backend, NewGameInput, NewRequestInput, Unsubscribe } from './types'
+import type {
+  Backend,
+  NewAchievementInput,
+  NewGameInput,
+  NewRequestInput,
+  Unsubscribe,
+} from './types'
 
 /**
  * Firebase implementation of the Backend contract.
@@ -418,5 +426,112 @@ export class FirebaseBackend implements Backend {
     return onSnapshot(q, (snap) => {
       cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as PlayEntry))
     })
+  }
+
+  // ---- game achievements (dev-defined, admin-approved) ----
+
+  watchAchievements(
+    gameId: string,
+    cb: (achievements: GameAchievement[]) => void,
+  ): Unsubscribe {
+    return onSnapshot(collection(this.db, 'games', gameId, 'achievements'), (snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, gameId, ...d.data() }) as GameAchievement)
+      cb(list.sort((a, b) => a.createdAt - b.createdAt))
+    })
+  }
+
+  async addAchievement(
+    gameId: string,
+    input: NewAchievementInput,
+    createdBy: string,
+  ): Promise<string> {
+    const ref_ = doc(collection(this.db, 'games', gameId, 'achievements'))
+    const now = Date.now()
+    const achievement: Omit<GameAchievement, 'id' | 'gameId'> = {
+      ...input,
+      status: 'pending',
+      unlockedBy: {},
+      createdBy,
+      createdAt: now,
+      updatedAt: now,
+    }
+    await setDoc(ref_, achievement)
+    return ref_.id
+  }
+
+  async updateAchievementContent(
+    gameId: string,
+    achievementId: string,
+    patch: NewAchievementInput,
+  ): Promise<void> {
+    await updateDoc(doc(this.db, 'games', gameId, 'achievements', achievementId), {
+      ...patch,
+      updatedAt: Date.now(),
+    })
+  }
+
+  async setAchievementStatus(
+    gameId: string,
+    achievementId: string,
+    status: AchievementStatus,
+  ): Promise<void> {
+    await updateDoc(doc(this.db, 'games', gameId, 'achievements', achievementId), {
+      status,
+      updatedAt: Date.now(),
+    })
+  }
+
+  async toggleAchievementUnlock(
+    gameId: string,
+    achievementId: string,
+    uid: string,
+    on: boolean,
+  ): Promise<void> {
+    await updateDoc(doc(this.db, 'games', gameId, 'achievements', achievementId), {
+      [`unlockedBy.${uid}`]: on ? true : deleteField(),
+    })
+  }
+
+  async deleteAchievement(gameId: string, achievementId: string): Promise<void> {
+    const ref_ = doc(this.db, 'games', gameId, 'achievements', achievementId)
+    const commentsSnap = await getDocs(collection(ref_, 'comments'))
+    await Promise.all(commentsSnap.docs.map((c) => deleteDoc(c.ref)))
+    await deleteDoc(ref_)
+  }
+
+  watchAchievementComments(
+    gameId: string,
+    achievementId: string,
+    cb: (comments: RequestComment[]) => void,
+  ): Unsubscribe {
+    return onSnapshot(
+      collection(this.db, 'games', gameId, 'achievements', achievementId, 'comments'),
+      (snap) => {
+        const comments = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as RequestComment)
+        cb(comments.sort((a, b) => a.createdAt - b.createdAt))
+      },
+    )
+  }
+
+  async addAchievementComment(
+    gameId: string,
+    achievementId: string,
+    authorUid: string,
+    text: string,
+  ): Promise<void> {
+    const comRef = doc(
+      collection(this.db, 'games', gameId, 'achievements', achievementId, 'comments'),
+    )
+    await setDoc(comRef, { authorUid, text, createdAt: Date.now() })
+  }
+
+  async deleteAchievementComment(
+    gameId: string,
+    achievementId: string,
+    commentId: string,
+  ): Promise<void> {
+    await deleteDoc(
+      doc(this.db, 'games', gameId, 'achievements', achievementId, 'comments', commentId),
+    )
   }
 }

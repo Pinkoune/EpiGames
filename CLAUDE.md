@@ -57,7 +57,11 @@ games/{gameId}       title, tagline, description (longue, page façon itch.io),
                      status(open|planned|in_progress|done|rejected),
                      authorUid, upvotes{uid:true}, createdAt, updatedAt
     comments/{id}    authorUid, text, createdAt
-  plays/{id}         gameId, title, at — historique de lancements (loggé au
+  achievements/{id}  icon, title, description, status(pending|approved|rejected),
+                     unlockedBy{uid:true}, createdBy, createdAt, updatedAt
+                     — succès définis par le dev, validés par l'admin (façon MR)
+    comments/{id}    authorUid, text, createdAt (fil de revue de la proposition)
+users/{uid}/plays/{id}   gameId, title, at — historique de lancements (loggé au
                      lancement, immuable ; owner écrit, tout membre lit)
 chats/{scopeId}/messages/{id}   authorUid, text, createdAt
                      scopeId = '_portal' (Général du portail) ou un gameId (Général du jeu)
@@ -94,6 +98,19 @@ friendships/{a_b}    id = paire uid triée, users[2], requestedBy, status(pendin
   (`isRequestClosed`). L'auteur peut clore (fait/refusé) ou rouvrir SA demande ;
   les états de triage (`planned`, `in_progress`) restent réservés aux owners.
   Fil de commentaires par demande, toujours ouvert même clos.
+- **Succès / trophées** : deux systèmes complémentaires.
+  1. *Méta-succès du portail* (`lib/achievements.ts`) : badges décernés
+     AUTOMATIQUEMENT à partir des données existantes (jeux publiés, bugs
+     signalés, upvotes reçus, amis, jeux joués via l'historique…). Calculés
+     à la volée sur la page profil (jamais stockés) — increvables, incheatables.
+  2. *Succès définis par les devs* (`games/{gameId}/achievements`) : le owner
+     PROPOSE un succès (`status: pending`), validé par un admin façon Merge
+     Request — fil de commentaires de revue, le owner édite sa proposition en
+     place, l'admin approuve/rejette (`AchievementReviewCard`). Une fois
+     `approved`, il devient officiel et les membres le débloquent à l'honneur
+     (`unlockedBy{uid:true}`, même pattern que les upvotes ; `AchievementBadge`).
+     Affichés sur la page du jeu (approuvés pour tous, en validation pour
+     owner+admin). Les règles réutilisent le pattern requests/comments.
 - **Mises à jour de jeu** : un owner publie UNE annonce courante
   (`game.update`, remplacée à chaque publication, retirable). Encart rendu
   AU-DESSUS de la description (markdown). Badge « MAJ » sur la carte tant que
