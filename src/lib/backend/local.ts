@@ -3,6 +3,7 @@ import type {
   Friendship,
   Game,
   GameRequest,
+  PlayEntry,
   PlayingStatus,
   PresenceInfo,
   RequestComment,
@@ -40,6 +41,8 @@ interface LocalDb {
   /** scopeId (PORTAL_SCOPE | gameId) -> chat messages */
   chats: Record<string, ChatMessage[]>
   friendships: Friendship[]
+  /** uid -> launch history (most recent first, capped). */
+  plays: Record<string, PlayEntry[]>
 }
 
 const EMPTY_DB: LocalDb = {
@@ -49,7 +52,10 @@ const EMPTY_DB: LocalDb = {
   comments: {},
   chats: {},
   friendships: [],
+  plays: {},
 }
+
+const PLAYS_CAP = 50
 
 function loadDb(): LocalDb {
   try {
@@ -497,5 +503,20 @@ export class LocalBackend implements Backend {
       const prev = p[uidTarget] ?? { online: true, lastSeen: Date.now(), playing: null }
       p[uidTarget] = { ...prev, lastSeen: Date.now(), playing }
     })
+    if (playing) await this.logPlay(uidTarget, playing.gameId, playing.title)
+  }
+
+  // ---- play history ----
+
+  async logPlay(uidTarget: string, gameId: string, title: string): Promise<void> {
+    this.mutate((db) => {
+      const list = db.plays[uidTarget] ?? (db.plays[uidTarget] = [])
+      list.unshift({ id: uid('play'), gameId, title, at: Date.now() })
+      db.plays[uidTarget] = list.slice(0, PLAYS_CAP)
+    })
+  }
+
+  watchPlays(uidTarget: string, cb: (plays: PlayEntry[]) => void): Unsubscribe {
+    return this.subscribe(() => cb([...(loadDb().plays[uidTarget] ?? [])]))
   }
 }

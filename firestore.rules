@@ -74,6 +74,16 @@ service cloud.firestore {
                 .hasAny(['isAdmin', 'linkedUids', 'createdAt']));
 
       allow delete: if isAdmin();
+
+      // ---------- play history ----------
+      // Launch records for this user. Owner appends; anyone signed in can read
+      // (shown on profiles). Immutable once written.
+      match /plays/{playId} {
+        allow read: if signedIn();
+        allow create: if signedIn() && request.auth.uid == uid;
+        allow update: if false;
+        allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      }
     }
 
     // ---------- games ----------

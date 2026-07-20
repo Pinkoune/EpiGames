@@ -8,6 +8,7 @@ import { useFriendsStore, friendUidsOf, pendingIncoming } from '../../stores/fri
 import { useGamesStore } from '../../stores/gamesStore'
 import { usePresenceStore } from '../../stores/presenceStore'
 import { ProfileEditor } from '../auth/ProfileEditor'
+import { NotificationsBell } from './NotificationsBell'
 import { Avatar } from '../ui'
 
 const navCls = ({ isActive }: { isActive: boolean }) =>
@@ -91,6 +92,7 @@ export function Shell() {
                 LOCAL
               </span>
             )}
+            <NotificationsBell />
             <div className="relative">
               <button
                 onClick={() => setMenuOpen((v) => !v)}

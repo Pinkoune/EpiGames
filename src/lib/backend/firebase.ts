@@ -10,6 +10,7 @@ import {
   type User,
 } from 'firebase/auth'
 import {
+  addDoc,
   collection,
   deleteDoc,
   deleteField,
@@ -17,7 +18,9 @@ import {
   getDoc,
   getDocs,
   getFirestore,
+  limit,
   onSnapshot,
+  orderBy,
   query,
   setDoc,
   updateDoc,
@@ -36,6 +39,7 @@ import type {
   Friendship,
   Game,
   GameRequest,
+  PlayEntry,
   PlayingStatus,
   PresenceInfo,
   RequestComment,
@@ -391,5 +395,28 @@ export class FirebaseBackend implements Backend {
 
   async setPlaying(uid: string, playing: PlayingStatus | null): Promise<void> {
     await update(ref(this.rtdb, `presence/${uid}`), { playing, lastSeen: Date.now() })
+    // Launching a game (playing != null) is the moment we log for history.
+    if (playing) await this.logPlay(uid, playing.gameId, playing.title)
+  }
+
+  // ---- play history (Firestore subcollection) ----
+
+  async logPlay(uid: string, gameId: string, title: string): Promise<void> {
+    await addDoc(collection(this.db, 'users', uid, 'plays'), {
+      gameId,
+      title,
+      at: Date.now(),
+    })
+  }
+
+  watchPlays(uid: string, cb: (plays: PlayEntry[]) => void): Unsubscribe {
+    const q = query(
+      collection(this.db, 'users', uid, 'plays'),
+      orderBy('at', 'desc'),
+      limit(30),
+    )
+    return onSnapshot(q, (snap) => {
+      cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as PlayEntry))
+    })
   }
 }

@@ -142,6 +142,19 @@ export interface PlayingStatus {
   since: number
 }
 
+/**
+ * One "I launched a game" record — logged at launch time (a moment we
+ * control), so history stays accurate even when a session ends by the tab
+ * simply closing (which runs no client code). Duration is deliberately not
+ * tracked: it can't be captured reliably for external games.
+ */
+export interface PlayEntry {
+  id: string
+  gameId: string
+  title: string
+  at: number
+}
+
 export interface PresenceInfo {
   online: boolean
   lastSeen: number

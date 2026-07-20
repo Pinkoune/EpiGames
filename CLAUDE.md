@@ -57,6 +57,8 @@ games/{gameId}       title, tagline, description (longue, page façon itch.io),
                      status(open|planned|in_progress|done|rejected),
                      authorUid, upvotes{uid:true}, createdAt, updatedAt
     comments/{id}    authorUid, text, createdAt
+  plays/{id}         gameId, title, at — historique de lancements (loggé au
+                     lancement, immuable ; owner écrit, tout membre lit)
 chats/{scopeId}/messages/{id}   authorUid, text, createdAt
                      scopeId = '_portal' (Général du portail) ou un gameId (Général du jeu)
 friendships/{a_b}    id = paire uid triée, users[2], requestedBy, status(pending|accepted)
@@ -118,7 +120,14 @@ friendships/{a_b}    id = paire uid triée, users[2], requestedBy, status(pendin
   traités comme publiés.
 
 RTDB : `presence/{uid}` = `{ online, lastSeen, playing: {gameId,title,since}|null }`.
-Le statut « joue à » est **déclaratif** (bouton ▶ Jouer poste le statut puis ouvre l'URL).
+Le statut « joue à » est **déclaratif** (bouton ▶ Jouer poste le statut puis ouvre l'URL)
+mais **auto-correctif** : `usePresenceAutoAway` (monté dans Shell) le coupe après
+12 min d'inactivité ou 4 h de session ; `onDisconnect` (RTDB) / heartbeat (local)
+le coupent à la fermeture de l'onglet ; et les jeux **embedded** le coupent dès
+qu'on quitte la page du jeu (précis car le jeu tourne dans la page — les jeux web
+externes ne peuvent pas l'être). Chaque `setPlaying(non-null)` logge une entrée
+`plays` (historique). Notifications légères : cloche topbar (`NotificationsBell`)
+100 % dérivée des stores (demandes d'ami, MAJ non vues, amis en jeu), sans stockage.
 
 Timestamps = `Date.now()` (nombres), pas des Timestamp Firestore — cohérent entre
 les deux backends.

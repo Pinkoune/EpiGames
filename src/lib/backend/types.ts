@@ -3,6 +3,7 @@ import type {
   Friendship,
   Game,
   GameRequest,
+  PlayEntry,
   PlayingStatus,
   PresenceInfo,
   RequestComment,
@@ -116,4 +117,10 @@ export interface Backend {
   goOnline(uid: string): void
   goOffline(uid: string): void
   setPlaying(uid: string, playing: PlayingStatus | null): Promise<void>
+
+  // ---- play history ----
+  /** Append a launch record for `uid` (called when a game is launched). */
+  logPlay(uid: string, gameId: string, title: string): Promise<void>
+  /** Most recent launches first (capped). */
+  watchPlays(uid: string, cb: (plays: PlayEntry[]) => void): Unsubscribe
 }
