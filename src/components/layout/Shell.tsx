@@ -32,7 +32,6 @@ export function Shell() {
   usePresenceAutoAway(user?.uid)
 
   const myPlaying = user ? (presence[user.uid]?.playing ?? null) : null
-  const playableGames = games.filter((g) => g.approved && !g.archived && g.status === 'live')
 
   const incoming = user ? pendingIncoming(friendships, user.uid).length : 0
   const pendingGames = user?.isAdmin ? games.filter((g) => !g.approved).length : 0
@@ -129,42 +128,19 @@ export function Shell() {
                     >
                       Modifier le profil
                     </button>
-                    {/* Declarative "playing" status lives here, Discord-style */}
-                    {user && (
+                    {/* Manual stop only — the status itself is only ever set by
+                        the ▶ Jouer button on a game, never picked from here. */}
+                    {user && myPlaying && (
                       <div className="border-t border-edge px-4 py-2.5">
-                        {myPlaying ? (
-                          <button
-                            onClick={() => {
-                              setMenuOpen(false)
-                              void setPlaying(user.uid, null)
-                            }}
-                            className="text-left text-sm text-emerald-400 hover:underline"
-                          >
-                            ■ Arrêter « {myPlaying.title} »
-                          </button>
-                        ) : playableGames.length > 0 ? (
-                          <>
-                            <p className="mb-1.5 text-xs tracking-wide text-ink-dim uppercase">
-                              Je joue à…
-                            </p>
-                            <div className="flex flex-col gap-1">
-                              {playableGames.slice(0, 6).map((g) => (
-                                <button
-                                  key={g.id}
-                                  onClick={() => {
-                                    setMenuOpen(false)
-                                    void setPlaying(user.uid, g)
-                                  }}
-                                  className="truncate text-left text-sm text-ink-dim transition hover:text-ink"
-                                >
-                                  🎮 {g.title}
-                                </button>
-                              ))}
-                            </div>
-                          </>
-                        ) : (
-                          <p className="text-xs text-ink-dim">Aucun jeu live à signaler.</p>
-                        )}
+                        <button
+                          onClick={() => {
+                            setMenuOpen(false)
+                            void setPlaying(user.uid, null)
+                          }}
+                          className="text-left text-sm text-emerald-400 hover:underline"
+                        >
+                          ■ Arrêter « {myPlaying.title} »
+                        </button>
                       </div>
                     )}
                     <button

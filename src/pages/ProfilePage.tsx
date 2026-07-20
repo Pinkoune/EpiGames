@@ -124,13 +124,21 @@ export function ProfilePage() {
   const backgroundCss = resolveProfileBackground(profile.profileBackground)
 
   return (
-    <div className="mx-auto max-w-4xl">
-      {/* Steam-style: the chosen background themes the whole profile page.
-          Fixed layer behind the content (-z-10), dimmed for readability. */}
+    <div className="relative z-10 mx-auto max-w-4xl">
+      {/*
+        Steam-style: the chosen background themes the whole profile page.
+        Note: z-0 here (NOT a negative z-index) — Shell's own .bp-bg wrapper
+        is a plain, non-positioned element, so its background paints in normal
+        flow (stacking step 3) which is AFTER negative-z-index content (step
+        2) but BEFORE z:auto/0 positioned content (step 6). A negative z-index
+        here would render this layer invisible, painted under Shell's opaque
+        background. This page's own root above carries `relative z-10` so its
+        content (step 7) stacks above this fixed layer in turn.
+      */}
       {backgroundCss && (
-        <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden>
+        <div className="pointer-events-none fixed inset-0 z-0" aria-hidden>
           <div className="absolute inset-0" style={{ background: backgroundCss }} />
-          <div className="absolute inset-0 bg-gradient-to-b from-abyss/70 via-abyss/85 to-abyss" />
+          <div className="absolute inset-0 bg-abyss/45" />
         </div>
       )}
 
