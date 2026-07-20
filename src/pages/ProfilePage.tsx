@@ -90,12 +90,13 @@ export function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      {/* Custom profile banner (Steam-style), purely decorative */}
+      {/* Steam-style: the chosen background themes the whole profile page.
+          Fixed layer behind the content (-z-10), dimmed for readability. */}
       {backgroundCss && (
-        <div
-          className="mb-4 h-32 rounded-lg border border-edge sm:h-40"
-          style={{ background: backgroundCss }}
-        />
+        <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden>
+          <div className="absolute inset-0" style={{ background: backgroundCss }} />
+          <div className="absolute inset-0 bg-gradient-to-b from-abyss/70 via-abyss/85 to-abyss" />
+        </div>
       )}
 
       {/* Header */}

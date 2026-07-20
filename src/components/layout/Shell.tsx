@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Logo } from '../Logo'
 import { backend } from '../../lib/backend'
+import { usePresenceAutoAway } from '../../lib/usePresenceAutoAway'
 import { useAuthStore } from '../../stores/authStore'
 import { useFriendsStore, friendUidsOf, pendingIncoming } from '../../stores/friendsStore'
 import { useGamesStore } from '../../stores/gamesStore'
@@ -25,6 +26,9 @@ export function Shell() {
 
   const presence = usePresenceStore((s) => s.presence)
   const setPlaying = usePresenceStore((s) => s.setPlaying)
+
+  // Self-correcting "en jeu": clears the status on prolonged inactivity.
+  usePresenceAutoAway(user?.uid)
 
   const myPlaying = user ? (presence[user.uid]?.playing ?? null) : null
   const playableGames = games.filter((g) => g.approved && !g.archived && g.status === 'live')

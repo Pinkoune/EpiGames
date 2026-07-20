@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { GameFormModal } from '../components/games/GameFormModal'
 import { GameUpdateModal } from '../components/games/GameUpdateModal'
@@ -51,6 +51,7 @@ export function GameDetailPage() {
   const [lightbox, setLightbox] = useState<string | null>(null)
   // Embedded games: whether the in-page iframe has been launched.
   const [embedRunning, setEmbedRunning] = useState(false)
+  const runStartRef = useRef(0)
 
   const game = games.find((g) => g.id === gameId)
 
@@ -73,6 +74,25 @@ export function GameDetailPage() {
       return diff !== 0 ? diff : b.createdAt - a.createdAt
     })
   }, [requests, statusFilter, typeFilter])
+
+  // Embedded games run in-page, so we KNOW when you leave: stop the "en jeu"
+  // status when you navigate away or close the tab (only if it's still this
+  // game). This is why embedded presence is accurate where web games can't be.
+  const embedKind = game?.kind
+  useEffect(() => {
+    if (!embedRunning || embedKind !== 'embedded' || !user || !gameId) return
+    runStartRef.current = Date.now()
+    const clearIfThis = () => {
+      const cur = usePresenceStore.getState().presence[user.uid]?.playing
+      if (cur?.gameId === gameId) void backend.setPlaying(user.uid, null)
+    }
+    window.addEventListener('pagehide', clearIfThis)
+    return () => {
+      window.removeEventListener('pagehide', clearIfThis)
+      // Guard against React StrictMode's dev-only mount/unmount/mount cycle.
+      if (Date.now() - runStartRef.current > 1500) clearIfThis()
+    }
+  }, [embedRunning, embedKind, user, gameId])
 
   if (!loaded) return <p className="py-20 text-center text-ink-dim">Chargement…</p>
   if (!game || !canSeeGame(user, game)) {

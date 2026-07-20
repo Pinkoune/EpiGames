@@ -8,8 +8,14 @@ export interface AvatarFrame {
   label: string
   /** Extra classes applied to the avatar's inner (bordered) box. */
   ringClass: string
-  /** True for the one animated frame (spinning conic-gradient backdrop). */
-  animated?: boolean
+  /**
+   * Animated backdrop behind the avatar:
+   * - 'spin' rotates a conic gradient (`spinBg`) around the avatar.
+   * - 'pulse' softly pulses a colored glow ring (`ringClass` carries the glow).
+   */
+  animation?: 'spin' | 'pulse'
+  /** conic-gradient CSS used when animation === 'spin'. */
+  spinBg?: string
 }
 
 export const AVATAR_FRAMES: Record<string, AvatarFrame> = {
@@ -35,7 +41,50 @@ export const AVATAR_FRAMES: Record<string, AvatarFrame> = {
     ringClass:
       'ring-2 ring-rose-400 ring-offset-2 ring-offset-abyss shadow-[0_0_10px_rgba(251,113,133,0.55)]',
   },
-  prisma: { label: 'Prisma (animé)', ringClass: '', animated: true },
+
+  // ---- animated ----
+  prisma: {
+    label: 'Prisma',
+    ringClass: '',
+    animation: 'spin',
+    spinBg: 'conic-gradient(from 0deg, #3d9cff, #a78bfa, #34d399, #fbbf24, #3d9cff)',
+  },
+  aurora: {
+    label: 'Aurore',
+    ringClass: '',
+    animation: 'spin',
+    spinBg: 'conic-gradient(from 0deg, #3d9cff, #22d3ee, #34d399, #3d9cff)',
+  },
+  inferno: {
+    label: 'Brasier',
+    ringClass: '',
+    animation: 'spin',
+    spinBg: 'conic-gradient(from 0deg, #fbbf24, #f97316, #ef4444, #fbbf24)',
+  },
+  goldshine: {
+    label: 'Or royal',
+    ringClass: '',
+    animation: 'spin',
+    spinBg: 'conic-gradient(from 0deg, #fde68a, #f59e0b, #fffbeb, #f59e0b, #fde68a)',
+  },
+  neon: {
+    label: 'Néon',
+    ringClass: '',
+    animation: 'spin',
+    spinBg: 'conic-gradient(from 0deg, #a855f7, #ec4899, #22d3ee, #a855f7)',
+  },
+  pulseAccent: {
+    label: 'Pulsation',
+    ringClass:
+      'ring-2 ring-accent shadow-[0_0_14px_rgba(61,156,255,0.8)]',
+    animation: 'pulse',
+  },
+  pulseEmerald: {
+    label: 'Battement',
+    ringClass:
+      'ring-2 ring-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.8)]',
+    animation: 'pulse',
+  },
 }
 
 export interface ProfileBackground {
