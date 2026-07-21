@@ -199,6 +199,21 @@ export function hasUnseenUpdate(user: UserProfile | null, game: Game): boolean {
   return (user.seenUpdates[game.id] ?? 0) < game.update.publishedAt
 }
 
+/** How long a freshly published game shows up as "new" (bell + card badge). */
+export const NEW_GAME_WINDOW_MS = 14 * 24 * 60 * 60 * 1000
+
+/**
+ * True while the game was published recently and the user hasn't dismissed
+ * it yet. Reuses the same `seenUpdates` map as `hasUnseenUpdate` (dismissal
+ * is just "seen up to timestamp X for this game") — no new field needed,
+ * and visiting the game page marks it seen (see GameDetailPage).
+ */
+export function hasUnseenNewGame(user: UserProfile | null, game: Game): boolean {
+  if (!user) return false
+  if (Date.now() - game.createdAt > NEW_GAME_WINDOW_MS) return false
+  return (user.seenUpdates[game.id] ?? 0) < game.createdAt
+}
+
 /** GitHub-style: a request is "closed" when done or rejected. */
 export function isRequestClosed(status: RequestStatus): boolean {
   return status === 'done' || status === 'rejected'

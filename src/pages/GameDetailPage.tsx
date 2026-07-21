@@ -26,6 +26,7 @@ import type { RequestStatus } from '../lib/types'
 import {
   GAME_KIND_LABELS,
   REQUEST_STATUS_LABELS,
+  hasUnseenNewGame,
   hasUnseenUpdate,
   isRequestClosed,
 } from '../lib/types'
@@ -100,6 +101,22 @@ export function GameDetailPage() {
       if (Date.now() - runStartRef.current > 1500) clearIfThis()
     }
   }, [embedRunning, embedKind, user, gameId])
+
+  // Visiting the game page is the dismissal signal for its "new" badge — no
+  // explicit button needed, mirrors how opening a chat clears its unread.
+  // `games` gets a new array reference on every store snapshot, so `game`
+  // itself churns identity constantly — the ref guards against re-firing
+  // (and re-writing the same seen timestamp) on every unrelated update.
+  const newGameMarkedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!user || !game) return
+    const key = `${user.uid}:${game.id}`
+    if (newGameMarkedRef.current === key) return
+    newGameMarkedRef.current = key
+    if (hasUnseenNewGame(user, game)) {
+      void backend.setSeenUpdate(user.uid, game.id, game.createdAt)
+    }
+  }, [user, game])
 
   if (!loaded) return <p className="py-20 text-center text-ink-dim">Chargement…</p>
   if (!game || !canSeeGame(user, game)) {

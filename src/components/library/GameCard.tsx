@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { coverFallback } from '../../lib/cover'
 import type { Game } from '../../lib/types'
-import { hasUnseenUpdate } from '../../lib/types'
+import { hasUnseenNewGame, hasUnseenUpdate } from '../../lib/types'
 import { usePresenceStore } from '../../stores/presenceStore'
 import { useAuthStore } from '../../stores/authStore'
 import { useUsersStore } from '../../stores/usersStore'
@@ -67,13 +67,23 @@ export function GameCard({
               EN ATTENTE
             </span>
           )}
-          {game.approved && hasUnseenUpdate(user, game) && (
+          {game.approved && hasUnseenUpdate(user, game) ? (
             <span
               className="absolute top-2 left-2 animate-pulse rounded bg-accent px-1.5 py-0.5 text-[11px] font-bold text-abyss"
               title={`Mise à jour ${game.update?.version ?? ''} disponible`}
             >
               MAJ
             </span>
+          ) : (
+            game.approved &&
+            hasUnseenNewGame(user, game) && (
+              <span
+                className="absolute top-2 left-2 rounded bg-accent px-1.5 py-0.5 text-[11px] font-bold text-abyss"
+                title="Ajouté récemment"
+              >
+                NOUVEAU
+              </span>
+            )
           )}
           {playersCount > 0 && (
             <span className="absolute bottom-2 left-2 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-400">

@@ -150,7 +150,14 @@ le coupent à la fermeture de l'onglet ; et les jeux **embedded** le coupent dè
 qu'on quitte la page du jeu (précis car le jeu tourne dans la page — les jeux web
 externes ne peuvent pas l'être). Chaque `setPlaying(non-null)` logge une entrée
 `plays` (historique). Notifications légères : cloche topbar (`NotificationsBell`)
-100 % dérivée des stores (demandes d'ami, MAJ non vues, amis en jeu), sans stockage.
+100 % dérivée des stores (demandes d'ami, nouveaux jeux non vus, MAJ non vues,
+amis en jeu), sans stockage dédié.
+- **Nouveaux jeux** : `hasUnseenNewGame` (types.ts) réutilise le champ
+  `seenUpdates` existant (pas de nouveau champ) — un jeu approuvé publié il y a
+  moins de 14 j (`NEW_GAME_WINDOW_MS`) et non vu affiche un badge « NOUVEAU »
+  sur sa carte (bibliothèque) et une entrée dans la cloche. Se dissipe tout
+  seul à la simple visite de la page du jeu (`backend.setSeenUpdate`), pas de
+  bouton dédié.
 
 Timestamps = `Date.now()` (nombres), pas des Timestamp Firestore — cohérent entre
 les deux backends.
@@ -179,10 +186,13 @@ En mode local : premier utilisateur créé = admin (pratique pour tester).
   avatars/noms de l'app pointent vers les profils.
 - **Bibliothèque** : sections par statut (Jouables maintenant / En dev /
   À venir / En pause) quand aucun filtre, grille plate en recherche ;
-  segmented Tous / Web / À installer ; tags dans un menu déroulant.
-- **Statut « je joue »** : déclaré depuis le menu avatar (topbar) — liste des
-  jeux live, ou « Arrêter ». Le bouton ▶ Jouer d'un jeu web le pose aussi
-  automatiquement. Plus de bouton dédié sur la page jeu.
+  segmented Tous / Web / À installer / Sur le portail (un onglet kind reste
+  masqué tant qu'aucun jeu de ce kind n'existe, ex. « Sur le portail » avant
+  le premier jeu embedded) ; tags dans un menu déroulant ; ligne d'aide
+  « Propose-le depuis ta page profil » pointant vers le profil du membre.
+- **Statut « je joue »** : posé uniquement par le bouton ▶ Jouer d'un jeu (web
+  ou embedded) — plus de sélecteur manuel de jeu dans le menu avatar (topbar),
+  qui ne garde qu'« Arrêter » comme garde-fou quand un statut est actif.
 - **Demandes** : fil de commentaires DÉPLOYÉ par défaut ; filtre segmented
   Tous / Bugs / Features sur la page jeu et le forum.
 
@@ -191,6 +201,14 @@ En mode local : premier utilisateur créé = admin (pratique pour tester).
 GitHub Pages via `.github/workflows/deploy.yml` (push sur main) : config
 Firebase lue depuis les Repository **Variables** `VITE_FIREBASE_*`. Ajouter le
 domaine `*.github.io` aux Authorized domains de Firebase Auth. Voir README.
+
+**Aperçu de lien (Discord etc.)** : balises `og:*`/`twitter:*` statiques dans
+`index.html` + `public/og-image.png` (généré, pas de source éditable — voir
+git history si besoin de le régénérer). SPA sans SSR (HashRouter) : les
+crawlers ne lisent QUE ce HTML statique, jamais le DOM rendu côté client —
+un seul aperçu possible pour tout le portail, pas un par jeu (ça demanderait
+du rendu serveur par route). URLs `og:` en absolu (`pinkoune.github.io`),
+à mettre à jour si le domaine change.
 
 ### Sécurité
 
