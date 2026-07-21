@@ -196,7 +196,6 @@ export function GameDetailPage() {
               title={game.title}
               className="h-[78vh] min-h-[460px] w-full"
               allow="fullscreen; autoplay; gamepad; clipboard-write"
-              allowFullScreen
             />
             <div className="flex items-center justify-between gap-3 border-t border-edge bg-panel px-3 py-2 text-xs text-ink-dim">
               <span>▶ En jeu — {game.title}</span>
