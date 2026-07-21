@@ -83,9 +83,12 @@ friendships/{a_b}    id = paire uid triée, users[2], requestedBy, status(pendin
   « Télécharger » et ne poste PAS de statut « joue à » (déclaration manuelle
   depuis la page du jeu).
 - `kind: 'embedded'` = jeu jouable DIRECTEMENT sur le portail (façon itch.io) :
-  `launchUrl` doit être une URL d'**intégration** (beaucoup de sites bloquent
-  le framing de leur page publique via X-Frame-Options/CSP — ex. itch.io :
-  Embed options → `https://itch.io/embed-upload/…`, PAS l'URL du jeu). La zone
+  `launchUrl` doit être une URL **intégrable en iframe** (le site doit
+  autoriser le framing). ⚠️ **itch.io ne marche PAS en intégré** : sa
+  protection anti-bot Cloudflare renvoie une 403 (`cf-mitigated: challenge`)
+  dans l'iframe, quel que soit le site embarquant (vérifié). Pour un jeu
+  embedded fiable, héberger le build HTML5 là où on maîtrise les en-têtes
+  (GitHub Pages, Netlify…) ; un jeu itch se met en `kind: 'web'`. La zone
   de jeu (iframe ~72vh) ne s'ouvre qu'au clic sur ▶ Jouer (état `embedRunning`
   local à la page), avec un bouton « Fermer » ; par défaut la page reste
   normale. Identité VERTE (ruban « ▶ JOUABLE ICI », bouton Jouer vert). Le

@@ -158,7 +158,7 @@ export function GameFormModal({ game, onClose }: { game?: Game; onClose: () => v
                 kind === 'download'
                   ? 'https://github.com/…/releases'
                   : kind === 'embedded'
-                    ? 'https://itch.io/embed-upload/1234567?color=333333'
+                    ? 'https://mon-pseudo.github.io/mon-jeu/'
                     : 'https://mon-jeu.example.com'
               }
             />
@@ -169,12 +169,16 @@ export function GameFormModal({ game, onClose }: { game?: Game; onClose: () => v
             )}
             {kind === 'embedded' && (
               <p className="mt-1 text-xs text-ink-dim/70">
-                Il faut l'URL d'<b>intégration</b>, pas la page du jeu — beaucoup
-                de sites bloquent l'affichage en iframe de leur page publique.
+                URL d'une page <b>intégrable en iframe</b> (le site doit
+                autoriser le framing).
                 <br />
-                <b>itch.io</b> : Edit game → Embed options → coche « Embed in
-                page », copie l'URL <code>https://itch.io/embed-upload/…</code>
-                {' '}(le nombre du <code>src</code> de l'iframe fournie).
+                ✅ Idéal : ton build HTML5 hébergé sur <b>GitHub Pages</b>,
+                Netlify, Vercel… (tu maîtrises les en-têtes).
+                <br />
+                ⚠️ <b>itch.io ne marche PAS</b> en intégré : sa protection
+                anti-bot Cloudflare renvoie une erreur 403 dans l'iframe. Pour
+                un jeu itch, prends plutôt le type « Jeu web » (bouton Jouer qui
+                ouvre l'onglet).
               </p>
             )}
           </div>
