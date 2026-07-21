@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { hasUnseenUpdate } from '../../lib/types'
+import { hasUnseenNewGame, hasUnseenUpdate } from '../../lib/types'
 import { useAuthStore } from '../../stores/authStore'
 import { useFriendsStore, friendUidsOf, pendingIncoming } from '../../stores/friendsStore'
 import { useGamesStore } from '../../stores/gamesStore'
@@ -11,8 +11,9 @@ import { Avatar } from '../ui'
 /**
  * Lightweight, ephemeral notifications — no storage, no new data model.
  * Everything is derived on the fly from what the app already watches:
- * pending friend requests, game updates you haven't dismissed, and friends
- * currently in-game. It's a glanceable digest, not an inbox.
+ * pending friend requests, newly published games, game updates you haven't
+ * dismissed, and friends currently in-game. It's a glanceable digest, not an
+ * inbox.
  */
 export function NotificationsBell() {
   const user = useAuthStore((s) => s.user)
@@ -28,11 +29,14 @@ export function NotificationsBell() {
   const updatedGames = games.filter(
     (g) => g.approved && !g.archived && hasUnseenUpdate(user, g),
   )
+  const newGames = games.filter(
+    (g) => g.approved && !g.archived && hasUnseenNewGame(user, g),
+  )
   const friendsInGame = friendUidsOf(friendships, user.uid)
     .map((uid) => ({ uid, info: presence[uid] }))
     .filter((f) => f.info?.online && f.info.playing)
 
-  const count = incoming.length + updatedGames.length
+  const count = incoming.length + updatedGames.length + newGames.length
   const isEmpty = count === 0 && friendsInGame.length === 0
 
   return (
@@ -84,6 +88,20 @@ export function NotificationsBell() {
                   </span>
                 </Link>
               )}
+
+              {newGames.map((g) => (
+                <Link
+                  key={g.id}
+                  to={`/game/${g.id}`}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm transition hover:bg-panel-2"
+                >
+                  <span className="text-accent">🚀</span>
+                  <span className="min-w-0">
+                    Nouveau jeu : <span className="font-semibold">{g.title}</span>
+                  </span>
+                </Link>
+              ))}
 
               {updatedGames.map((g) => (
                 <Link

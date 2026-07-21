@@ -12,6 +12,23 @@
       rel="stylesheet"
     />
     <title>Epigames</title>
+
+    <!--
+      Static SPA (HashRouter, no SSR) — Discord/social crawlers only read
+      THIS file, never the client-rendered DOM. So this can only ever be one
+      portal-wide preview, not a per-game one (a per-game card à la itch.io
+      would need server-side rendering per route). Absolute URLs required:
+      crawlers don't reliably resolve relative og: URLs.
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Epigames" />
+    <meta property="og:description" content="Les jeux du groupe. Un seul endroit." />
+    <meta property="og:image" content="https://pinkoune.github.io/EpiGames/og-image.png" />
+    <meta property="og:url" content="https://pinkoune.github.io/EpiGames/" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Epigames" />
+    <meta name="twitter:description" content="Les jeux du groupe. Un seul endroit." />
+    <meta name="twitter:image" content="https://pinkoune.github.io/EpiGames/og-image.png" />
   </head>
   <body>
     <div id="root"></div>

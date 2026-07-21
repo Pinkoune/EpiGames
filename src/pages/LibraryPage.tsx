@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { GameCard } from '../components/library/GameCard'
 import { DownloadIcon, inputCls } from '../components/ui'
 import { useRequestsMap } from '../lib/hooks'
@@ -57,6 +58,17 @@ export function LibraryPage() {
   )
   const requestsMap = useRequestsMap(listable.map((g) => g.id))
 
+  // Hide a kind tab entirely while no game of that kind exists yet — an
+  // always-empty filter is just clutter (e.g. "Sur le portail" before the
+  // first embedded game ships).
+  const visibleKindFilters = useMemo(
+    () =>
+      KIND_FILTERS.filter(
+        (k) => k.value === 'all' || listable.some((g) => g.kind === k.value),
+      ),
+    [listable],
+  )
+
   const filtered = listable
     .filter((g) => {
       if (g.archived !== showArchived) return false
@@ -98,7 +110,7 @@ export function LibraryPage() {
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center gap-3">
+      <div className="mb-1 flex flex-wrap items-center gap-3">
         <h1 className="font-display text-3xl font-bold tracking-tight">Bibliothèque</h1>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <input
@@ -119,10 +131,20 @@ export function LibraryPage() {
         </div>
       </div>
 
+      {user && (
+        <p className="mb-6 text-xs text-ink-dim">
+          Un jeu qui traîne ?{' '}
+          <Link to={`/profile/${user.uid}`} className="text-accent hover:underline">
+            Propose-le depuis ta page profil
+          </Link>
+          .
+        </p>
+      )}
+
       {/* Kind filter + tags menu */}
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <div className="flex overflow-hidden rounded-md border border-edge">
-          {KIND_FILTERS.map((k) => (
+          {visibleKindFilters.map((k) => (
             <button
               key={k.value}
               onClick={() => setKindFilter(k.value)}
