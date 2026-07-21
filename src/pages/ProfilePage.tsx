@@ -265,27 +265,39 @@ export function ProfilePage() {
         )}
       </section>
 
-      {/* Play history — recent launches (accurate for embedded, declared for the rest) */}
+      {/* Play history — recent launches (accurate for embedded, declared for
+          the rest). `plays` logs every launch (needed for the "Habitué"
+          achievement's raw count), but re-launching the same game in a row
+          shouldn't repeat it 8 times here — collapse to one row per game,
+          keeping its most recent launch (list already comes newest-first). */}
       {plays.length > 0 && (
         <section className="mt-8">
           <SectionLabel>Parties récentes</SectionLabel>
           <div className="space-y-1.5">
-            {plays.slice(0, 8).map((play) => {
-              const game = games.find((g) => g.id === play.gameId)
-              return (
-                <Link
-                  key={play.id}
-                  to={`/game/${play.gameId}`}
-                  className="flex items-center gap-2 rounded-md border border-edge bg-panel px-3 py-2 text-sm transition hover:border-edge-2"
-                >
-                  <span className="text-emerald-400">🎮</span>
-                  <span className="truncate">{game?.title ?? play.title}</span>
-                  <span className="ml-auto shrink-0 text-xs text-ink-dim">
-                    {relativeTime(play.at)}
-                  </span>
-                </Link>
-              )
-            })}
+            {Object.values(
+              plays.reduce<Record<string, PlayEntry>>((byGame, play) => {
+                byGame[play.gameId] ??= play
+                return byGame
+              }, {}),
+            )
+              .sort((a, b) => b.at - a.at)
+              .slice(0, 8)
+              .map((play) => {
+                const game = games.find((g) => g.id === play.gameId)
+                return (
+                  <Link
+                    key={play.id}
+                    to={`/game/${play.gameId}`}
+                    className="flex items-center gap-2 rounded-md border border-edge bg-panel px-3 py-2 text-sm transition hover:border-edge-2"
+                  >
+                    <span className="text-emerald-400">🎮</span>
+                    <span className="truncate">{game?.title ?? play.title}</span>
+                    <span className="ml-auto shrink-0 text-xs text-ink-dim">
+                      {relativeTime(play.at)}
+                    </span>
+                  </Link>
+                )
+              })}
           </div>
         </section>
       )}
