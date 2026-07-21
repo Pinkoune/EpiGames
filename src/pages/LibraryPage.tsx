@@ -110,36 +110,37 @@ export function LibraryPage() {
 
   return (
     <div>
-      <div className="mb-1 flex flex-wrap items-center gap-3">
+      <div className="mb-6 flex flex-wrap items-center gap-3">
         <h1 className="font-display text-3xl font-bold tracking-tight">Bibliothèque</h1>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <input
-            className={`${inputCls} w-52`}
-            placeholder="Rechercher un jeu, un tag…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <label className="flex items-center gap-1.5 text-sm text-ink-dim">
+        <div className="ml-auto flex flex-col items-end gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
             <input
-              type="checkbox"
-              checked={showArchived}
-              onChange={(e) => setShowArchived(e.target.checked)}
-              className="accent-accent"
+              className={`${inputCls} w-52`}
+              placeholder="Rechercher un jeu, un tag…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
-            Archivés
-          </label>
+            <label className="flex items-center gap-1.5 text-sm text-ink-dim">
+              <input
+                type="checkbox"
+                checked={showArchived}
+                onChange={(e) => setShowArchived(e.target.checked)}
+                className="accent-accent"
+              />
+              Archivés
+            </label>
+          </div>
+          {user && (
+            <p className="text-xs text-ink-dim">
+              Un jeu qui traîne ?{' '}
+              <Link to={`/profile/${user.uid}`} className="text-accent hover:underline">
+                Propose-le depuis ta page profil
+              </Link>
+              .
+            </p>
+          )}
         </div>
       </div>
-
-      {user && (
-        <p className="mb-6 text-xs text-ink-dim">
-          Un jeu qui traîne ?{' '}
-          <Link to={`/profile/${user.uid}`} className="text-accent hover:underline">
-            Propose-le depuis ta page profil
-          </Link>
-          .
-        </p>
-      )}
 
       {/* Kind filter + tags menu */}
       <div className="mb-6 flex flex-wrap items-center gap-3">
