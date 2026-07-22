@@ -103,6 +103,13 @@ export interface Game {
    * (the dev may let players grab a standalone build). Empty = no button.
    */
   downloadUrl: string
+  /**
+   * The game talks to the portal through the postMessage bridge
+   * (lib/gameBridge.ts): it can unlock achievements and receive the session
+   * + notifications. Opt-in per game because it also relaxes how the game is
+   * opened (a `web` game needs `window.opener` kept alive to answer back).
+   */
+  bridge: boolean
   /** Source repository URL (optional). */
   repoUrl: string
   status: GameStatus
@@ -172,6 +179,13 @@ export type AchievementStatus = 'pending' | 'approved' | 'rejected'
 export interface GameAchievement {
   id: string
   gameId: string
+  /**
+   * Stable slug the GAME references when it reports an unlock through the
+   * bridge (e.g. 'first_death'). Doc ids are generated, so a code is what
+   * lets game code stay readable and survive re-creation. '' = portal-only
+   * achievement, unlocked by hand.
+   */
+  code: string
   icon: string
   title: string
   description: string
@@ -298,6 +312,7 @@ export function normalizeGame(raw: Partial<Game> & { id: string }): Game {
     kind: 'web',
     launchUrl: '',
     downloadUrl: '',
+    bridge: false,
     repoUrl: '',
     status: 'dev',
     tags: [],

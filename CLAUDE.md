@@ -320,6 +320,30 @@ Jeux téléchargeables (`kind: 'download'`) = identité VIOLETTE (ruban « À
 installer », bouton Télécharger violet, panneau Installation) ; jeux web =
 accent bleu. `cursor: pointer` global sur toute surface cliquable (index.css).
 
+### Pont portail ↔ jeu (`lib/gameBridge.ts` + `public/epigames-sdk.js`)
+
+Un jeu peut débloquer ses succès et recevoir les notifications du portail via
+**postMessage**. Ce n'est PAS le SSO de la phase 2 et ça ne le préempte pas :
+le jeu n'écrit jamais dans Firestore — il poste un message, et le PORTAIL écrit
+avec le compte du joueur déjà connecté. Donc aucun jeton signé, aucune Cloud
+Function, aucun couplage de projets Firebase.
+
+- Opt-in par jeu : `game.bridge` (case dans GameFormModal). Nécessaire car pour
+  un jeu `web` le portail doit lâcher `noopener` à l'ouverture pour garder
+  `window.opener` vivant (voir `presenceStore.launchGame`) — les autres jeux
+  gardent `noopener`.
+- Deux transports, même protocole : `iframe.contentWindow` (embedded) ou la
+  fenêtre ouverte (`web`, réponse via `window.opener`).
+- Succès : `GameAchievement.code` (slug stable, ex. `boss_final`) — les doc ids
+  sont générés, le code est ce qui rend le code du jeu lisible. Le déblocage
+  réutilise la règle existante « un membre ne bascule que SA clé `unlockedBy`
+  sur un succès approuvé » → **aucune permission nouvelle**.
+- Sécurité : l'origine des messages est validée contre l'`launchUrl` du jeu.
+  Reste client-authoritative (pas un anti-triche), cohérent avec le reste.
+- Les bulles du portail sont retransmises au jeu (`epigames:notification`) —
+  utile en plein écran, où les bulles du portail sont cachées.
+- Doc destinée aux devs de jeux : **`docs/INTEGRATION.md`** (template inclus).
+
 ## Phase 2 — SSO (note d'intention, NE PAS implémenter)
 
 Objectif : se connecter une fois sur Epigames, lancer n'importe quel jeu du

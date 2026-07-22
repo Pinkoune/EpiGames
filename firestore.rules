@@ -234,10 +234,13 @@ service cloud.firestore {
         }
 
         // Owner edits the proposal content in place (never the status/unlocks).
+        // `code` is the slug the game reports through the bridge — content,
+        // so the owner owns it; it grants nothing on its own (unlocking still
+        // goes through isOwnUnlockToggle below).
         function isOwnerContentEdit() {
           return ownsGame()
             && request.resource.data.diff(resource.data).affectedKeys()
-                .hasOnly(['icon', 'title', 'description', 'updatedAt']);
+                .hasOnly(['code', 'icon', 'title', 'description', 'updatedAt']);
         }
 
         allow read: if signedIn();

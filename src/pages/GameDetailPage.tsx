@@ -31,6 +31,8 @@ import {
   isRequestClosed,
 } from '../lib/types'
 import { backend } from '../lib/backend'
+import { connectGameBridge, getOpenedGameWindow } from '../lib/gameBridge'
+import { useToastStore } from '../stores/toastStore'
 import { useAuthStore } from '../stores/authStore'
 import { canEditGame, canSeeGame, useGamesStore } from '../stores/gamesStore'
 import { usePresenceStore } from '../stores/presenceStore'
@@ -60,6 +62,7 @@ export function GameDetailPage() {
   // Embedded games: whether the in-page iframe has been launched.
   const [embedRunning, setEmbedRunning] = useState(false)
   const runStartRef = useRef(0)
+  const embedRef = useRef<HTMLIFrameElement>(null)
 
   const game = games.find((g) => g.id === gameId)
 
@@ -82,6 +85,55 @@ export function GameDetailPage() {
       return diff !== 0 ? diff : b.createdAt - a.createdAt
     })
   }, [requests, statusFilter, typeFilter])
+
+  // ---- portal <-> game bridge ----
+  // Connected on stable keys only (id / uid / running), with the mutable
+  // pieces read through getters off a ref — otherwise the store handing us a
+  // fresh `game` array identity on every snapshot would tear the listener
+  // down and rebuild it constantly.
+  const bridgeState = useRef({ game, user, achievements })
+  bridgeState.current = { game, user, achievements }
+  const bridgeRef = useRef<ReturnType<typeof connectGameBridge> | null>(null)
+  const bridgeOn = Boolean(game?.bridge && user)
+  const bridgeKey = `${game?.id ?? ''}:${user?.uid ?? ''}:${game?.kind ?? ''}`
+
+  useEffect(() => {
+    if (!bridgeOn) return
+    const conn = connectGameBridge({
+      get game() {
+        return bridgeState.current.game!
+      },
+      get user() {
+        return bridgeState.current.user!
+      },
+      get achievements() {
+        return bridgeState.current.achievements
+      },
+      target: () =>
+        bridgeState.current.game?.kind === 'embedded'
+          ? (embedRef.current?.contentWindow ?? null)
+          : getOpenedGameWindow(),
+      onToast: (title, body) =>
+        useToastStore.getState().push({ icon: '🎮', title, body }),
+    })
+    bridgeRef.current = conn
+    return () => {
+      conn.stop()
+      bridgeRef.current = null
+    }
+  }, [bridgeOn, bridgeKey])
+
+  // Mirror portal notifications into the game — when it runs fullscreen the
+  // portal's own toasts are hidden behind it.
+  const toasts = useToastStore((s) => s.toasts)
+  const forwarded = useRef(new Set<string>())
+  useEffect(() => {
+    for (const t of toasts) {
+      if (forwarded.current.has(t.id)) continue
+      forwarded.current.add(t.id)
+      bridgeRef.current?.notify({ title: t.title, body: t.body, icon: t.icon })
+    }
+  }, [toasts])
 
   // Embedded games run in-page, so we KNOW when you leave: stop the "en jeu"
   // status when you navigate away or close the tab (only if it's still this
@@ -209,6 +261,7 @@ export function GameDetailPage() {
               Acceptable here — trusted small group, games added by known devs.
             */}
             <iframe
+              ref={embedRef}
               src={game.launchUrl}
               title={game.title}
               className="h-[78vh] min-h-[460px] w-full"

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { backend } from '../lib/backend'
+import { setOpenedGameWindow } from '../lib/gameBridge'
 import type { Game, PresenceInfo } from '../lib/types'
 
 interface PresenceState {
@@ -37,7 +38,13 @@ export const usePresenceStore = create<PresenceState>((set) => ({
     }
     // Embedded games render in-page (iframe); everything else opens externally.
     if (game.kind !== 'embedded') {
-      window.open(game.launchUrl, '_blank', 'noopener')
+      // `noopener` is the safe default, but it also severs `window.opener` —
+      // the only back-channel a game in another tab has. Drop it ONLY for
+      // games that opted into the bridge (our own, declared by an owner).
+      const win = game.bridge
+        ? window.open(game.launchUrl, '_blank')
+        : window.open(game.launchUrl, '_blank', 'noopener')
+      if (game.bridge) setOpenedGameWindow(win)
     }
   },
 }))

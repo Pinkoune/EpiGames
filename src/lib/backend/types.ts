@@ -25,6 +25,8 @@ export interface NewGameInput {
   kind: Game['kind']
   launchUrl: string
   downloadUrl: string
+  /** Opt into the portal <-> game postMessage bridge (lib/gameBridge.ts). */
+  bridge: boolean
   repoUrl: string
   status: Game['status']
   tags: string[]
@@ -38,6 +40,8 @@ export interface NewRequestInput {
 }
 
 export interface NewAchievementInput {
+  /** Stable slug the game reports through the bridge ('' = portal-only). */
+  code: string
   icon: string
   title: string
   description: string

@@ -20,12 +20,23 @@ export function AchievementFormModal({
   const [icon, setIcon] = useState(achievement?.icon ?? '🏆')
   const [title, setTitle] = useState(achievement?.title ?? '')
   const [description, setDescription] = useState(achievement?.description ?? '')
+  const [code, setCode] = useState(achievement?.code ?? '')
   const [busy, setBusy] = useState(false)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (!user) return
-    const input = { icon, title: title.trim(), description: description.trim() }
+    const input = {
+      icon,
+      title: title.trim(),
+      description: description.trim(),
+      // Normalized to a safe slug: it's an identifier used in game code.
+      code: code
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_]+/g, '_')
+        .replace(/^_|_$/g, ''),
+    }
     setBusy(true)
     try {
       if (achievement) await backend.updateAchievementContent(gameId, achievement.id, input)
@@ -89,6 +100,23 @@ export function AchievementFormModal({
             maxLength={200}
             placeholder="Finir le jeu en moins de 10 minutes."
           />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm text-ink-dim">
+            Code (optionnel — déblocage par le jeu)
+          </label>
+          <input
+            className={`${inputCls} font-mono text-sm`}
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            maxLength={40}
+            placeholder="speedrun_10min"
+          />
+          <p className="mt-1 text-xs text-ink-dim/70">
+            Si ton jeu utilise le pont Epigames, il débloque ce succès avec{' '}
+            <code className="rounded bg-panel-2 px-1">Epigames.unlock('code')</code>.
+            Laisse vide pour un succès débloqué à la main.
+          </p>
         </div>
         <button type="submit" disabled={busy} className={`${btnPrimary} w-full`}>
           {achievement ? 'Enregistrer' : 'Proposer'}

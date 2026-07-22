@@ -22,6 +22,7 @@ export function GameFormModal({ game, onClose }: { game?: Game; onClose: () => v
   const [screenshotsRaw, setScreenshotsRaw] = useState(game?.screenshots.join('\n') ?? '')
   const [launchUrl, setLaunchUrl] = useState(game?.launchUrl ?? '')
   const [downloadUrl, setDownloadUrl] = useState(game?.downloadUrl ?? '')
+  const [bridge, setBridge] = useState(game?.bridge ?? false)
   const [repoUrl, setRepoUrl] = useState(game?.repoUrl ?? '')
   const [status, setStatus] = useState<GameStatus>(game?.status ?? 'dev')
   const [tagsRaw, setTagsRaw] = useState(game?.tags.join(', ') ?? '')
@@ -60,6 +61,8 @@ export function GameFormModal({ game, onClose }: { game?: Game; onClose: () => v
       launchUrl: launchUrl.trim(),
       // Download button below "Jouer" is embedded-only.
       downloadUrl: kind === 'embedded' ? downloadUrl.trim() : '',
+      // Download-only games have no page to talk from.
+      bridge: kind === 'download' ? false : bridge,
       repoUrl: repoUrl.trim(),
       status,
       tags: tagsRaw
@@ -209,6 +212,27 @@ export function GameFormModal({ game, onClose }: { game?: Game; onClose: () => v
             <p className="mt-1 text-xs text-ink-dim/70">
               Ajoute un bouton « Télécharger » sous le bouton « Jouer ».
             </p>
+          </div>
+        )}
+
+        {kind !== 'download' && (
+          <div className="rounded-lg border border-edge bg-panel-2/40 p-3">
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={bridge}
+                onChange={(e) => setBridge(e.target.checked)}
+                className="mt-0.5 accent-accent"
+              />
+              <span>
+                <span className="font-medium">Pont Epigames</span>
+                <span className="mt-0.5 block text-xs text-ink-dim">
+                  Le jeu peut débloquer ses succès et recevoir les notifications du
+                  portail. À cocher seulement si le jeu intègre le SDK — voir{' '}
+                  <code className="rounded bg-panel-2 px-1">docs/INTEGRATION.md</code>.
+                </span>
+              </span>
+            </label>
           </div>
         )}
 
