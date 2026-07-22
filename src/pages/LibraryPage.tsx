@@ -110,12 +110,12 @@ export function LibraryPage() {
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <h1 className="font-display text-3xl font-bold tracking-tight">Bibliothèque</h1>
-        <div className="ml-auto flex flex-col items-end gap-1.5">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Bibliothèque</h1>
+        <div className="flex flex-col gap-1.5 sm:ml-auto sm:items-end">
           <div className="flex flex-wrap items-center gap-2">
             <input
-              className={`${inputCls} w-52`}
+              className={`${inputCls} sm:w-52`}
               placeholder="Rechercher un jeu, un tag…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -144,12 +144,12 @@ export function LibraryPage() {
 
       {/* Kind filter + tags menu */}
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        <div className="flex overflow-hidden rounded-md border border-edge">
+        <div className="flex max-w-full overflow-x-auto rounded-md border border-edge">
           {visibleKindFilters.map((k) => (
             <button
               key={k.value}
               onClick={() => setKindFilter(k.value)}
-              className={`px-3 py-1.5 text-sm font-medium transition ${
+              className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-sm font-medium transition ${
                 kindFilter === k.value
                   ? 'bg-accent text-abyss'
                   : 'bg-panel text-ink-dim hover:text-ink'

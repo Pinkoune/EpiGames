@@ -32,6 +32,15 @@ export function ForumPage() {
   const [addingRequest, setAddingRequest] = useState(false)
   const [showClosed, setShowClosed] = useState(false)
   const [typeFilter, setTypeFilter] = useState<'all' | 'bug' | 'feature'>('all')
+  // Mobile: the triage sidebar is a collapsible drawer (it's a long list, so
+  // showing it stacked above the content on every visit would bury the chat).
+  const [navOpen, setNavOpen] = useState(false)
+
+  // Selecting a channel also closes the mobile drawer.
+  const select = (next: Selection) => {
+    setSelection(next)
+    setNavOpen(false)
+  }
 
   const visibleGames = useMemo(
     () => games.filter((g) => !g.archived && canSeeGame(user, g)),
@@ -71,13 +80,13 @@ export function ForumPage() {
     return (
       <>
         <button
-          onClick={() => setSelection({ scope, view: 'general' })}
+          onClick={() => select({ scope, view: 'general' })}
           className={entryCls(selection.scope === scope && selection.view === 'general')}
         >
           <span className="text-ink-dim/70">#</span> Général
         </button>
         <button
-          onClick={() => setSelection({ scope, view: 'requests' })}
+          onClick={() => select({ scope, view: 'requests' })}
           className={entryCls(selection.scope === scope && selection.view === 'requests')}
         >
           <span className="text-ink-dim/70">◌</span>
@@ -95,7 +104,7 @@ export function ForumPage() {
           .map((r) => (
             <button
               key={r.id}
-              onClick={() => setSelection({ scope, view: 'requests' })}
+              onClick={() => select({ scope, view: 'requests' })}
               className="flex w-full items-center gap-1.5 rounded px-2.5 py-0.5 text-left text-xs text-ink-dim/70 transition hover:text-ink"
               title={r.title}
             >
@@ -109,10 +118,29 @@ export function ForumPage() {
     )
   }
 
+  const currentLabel =
+    (selection.scope === PORTAL_SCOPE ? 'Portail' : selectedGame.title) +
+    (selection.view === 'general' ? ' · # Général' : ' · ◌ Bugs & features')
+
   return (
     <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
+      {/* Mobile channel picker toggle */}
+      <button
+        onClick={() => setNavOpen((v) => !v)}
+        className="flex items-center justify-between gap-2 rounded-lg border border-edge bg-panel px-3 py-2.5 text-sm lg:hidden"
+        aria-expanded={navOpen}
+      >
+        <span className="min-w-0 truncate">
+          <span className="text-ink-dim">Salon : </span>
+          <span className="font-medium">{currentLabel}</span>
+        </span>
+        <span className="shrink-0 text-ink-dim">{navOpen ? '▲' : '▼'}</span>
+      </button>
+
       {/* Triage sidebar */}
-      <aside className="lg:sticky lg:top-20 lg:self-start">
+      <aside
+        className={`${navOpen ? 'block' : 'hidden'} lg:block lg:sticky lg:top-20 lg:self-start`}
+      >
         <div className="space-y-5 rounded-lg border border-edge bg-panel p-3">
           <div>
             <p className="mb-1.5 px-2 text-xs font-semibold tracking-[0.15em] text-ink-dim uppercase">
@@ -143,7 +171,7 @@ export function ForumPage() {
             </span>
           </h1>
           {selection.view === 'requests' && (
-            <div className="ml-auto flex items-center gap-3">
+            <div className="flex w-full flex-wrap items-center gap-3 sm:ml-auto sm:w-auto">
               <div className="flex overflow-hidden rounded-md border border-edge">
                 {(
                   [

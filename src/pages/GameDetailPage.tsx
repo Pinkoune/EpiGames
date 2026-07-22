@@ -167,16 +167,16 @@ export function GameDetailPage() {
 
       {/* Hero */}
       <div
-        className="mt-4 flex aspect-[21/7] items-end overflow-hidden rounded-lg border border-edge bg-cover bg-center"
+        className="mt-4 flex aspect-[16/10] items-end overflow-hidden rounded-lg border border-edge bg-cover bg-center sm:aspect-[21/7]"
         style={
           game.coverUrl
             ? { backgroundImage: `url(${game.coverUrl})` }
             : { background: coverFallback(game.id) }
         }
       >
-        <div className="w-full bg-gradient-to-t from-black/85 via-black/40 to-transparent px-6 pt-16 pb-4">
+        <div className="w-full bg-gradient-to-t from-black/85 via-black/40 to-transparent px-4 pt-10 pb-4 sm:px-6 sm:pt-16">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <h1 className="font-display text-4xl font-bold tracking-tight text-white">
+            <h1 className="font-display text-2xl font-bold tracking-tight text-white sm:text-4xl">
               {game.title}
             </h1>
             <GameStatusBadge status={game.status} />
@@ -336,12 +336,12 @@ export function GameDetailPage() {
 
           {/* Requests */}
           <section>
-            <div className="mb-4 flex flex-wrap items-center gap-3">
+            <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
               <SectionLabel>Demandes & retours</SectionLabel>
               <span className="-mt-3 text-xs text-ink-dim">
                 {openCount} ouvertes · {closedCount} closes
               </span>
-              <div className="ml-auto -mt-2 flex items-center gap-2">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
                 <div className="flex overflow-hidden rounded-md border border-edge">
                   {(
                     [

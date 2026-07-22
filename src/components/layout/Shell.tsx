@@ -18,12 +18,19 @@ const navCls = ({ isActive }: { isActive: boolean }) =>
       : 'border-transparent text-ink-dim hover:text-ink'
   }`
 
+// Full-width rows for the mobile drawer.
+const mobileNavCls = ({ isActive }: { isActive: boolean }) =>
+  `flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium transition ${
+    isActive ? 'bg-accent/15 text-accent' : 'text-ink-dim hover:bg-panel-2 hover:text-ink'
+  }`
+
 export function Shell() {
   const { user, signOut } = useAuthStore()
   const friendships = useFriendsStore((s) => s.friendships)
   const games = useGamesStore((s) => s.games)
   const [editingProfile, setEditingProfile] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
 
   const presence = usePresenceStore((s) => s.presence)
   const setPlaying = usePresenceStore((s) => s.setPlaying)
@@ -39,53 +46,90 @@ export function Shell() {
     ? friendUidsOf(friendships, user.uid).filter((uid) => presence[uid]?.online).length
     : 0
 
+  // Nav links shared between the desktop bar and the mobile drawer, so the
+  // badges (online friends, pending requests, pending games) stay in sync.
+  const navLinks = (
+    cls: typeof navCls,
+    onClick?: () => void,
+  ) => (
+    <>
+      <NavLink to="/" end className={cls} onClick={onClick}>
+        Bibliothèque
+      </NavLink>
+      <NavLink to="/forum" className={cls} onClick={onClick}>
+        Forum
+      </NavLink>
+      <NavLink to="/friends" className={cls} onClick={onClick}>
+        Amis
+        {onlineFriends > 0 && (
+          <span
+            className="ml-1.5 text-xs font-semibold text-emerald-400"
+            title={`${onlineFriends} ami(s) en ligne`}
+          >
+            ● {onlineFriends}
+          </span>
+        )}
+        {incoming > 0 && (
+          <span className="ml-1.5 rounded-full bg-accent px-1.5 text-xs font-bold text-abyss">
+            {incoming}
+          </span>
+        )}
+      </NavLink>
+      {user?.isAdmin && (
+        <NavLink to="/admin" className={cls} onClick={onClick}>
+          Admin
+          {pendingGames > 0 && (
+            <span className="ml-1.5 rounded-full bg-amber-400 px-1.5 text-xs font-bold text-abyss">
+              {pendingGames}
+            </span>
+          )}
+        </NavLink>
+      )}
+    </>
+  )
+
   return (
     <div className="bp-bg flex min-h-full flex-col">
       <header className="sticky top-0 z-40 border-b border-edge bg-abyss/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4">
-          <NavLink to="/">
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:gap-6">
+          {/* Hamburger — mobile only */}
+          <button
+            onClick={() => setNavOpen((v) => !v)}
+            className="-ml-1 flex h-9 w-9 items-center justify-center rounded-md text-ink-dim transition hover:bg-panel-2 hover:text-ink md:hidden"
+            aria-label="Menu"
+            aria-expanded={navOpen}
+          >
+            <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" aria-hidden>
+              {navOpen ? (
+                <path
+                  d="M5 5l10 10M15 5L5 15"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+              ) : (
+                <path
+                  d="M3 6h14M3 10h14M3 14h14"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+              )}
+            </svg>
+          </button>
+
+          <NavLink to="/" onClick={() => setNavOpen(false)}>
             <Logo size="sm" />
           </NavLink>
 
-          <nav className="flex h-full items-center gap-1">
-            <NavLink to="/" end className={navCls}>
-              Bibliothèque
-            </NavLink>
-            <NavLink to="/forum" className={navCls}>
-              Forum
-            </NavLink>
-            <NavLink to="/friends" className={navCls}>
-              Amis
-              {onlineFriends > 0 && (
-                <span
-                  className="ml-1.5 text-xs font-semibold text-emerald-400"
-                  title={`${onlineFriends} ami(s) en ligne`}
-                >
-                  ● {onlineFriends}
-                </span>
-              )}
-              {incoming > 0 && (
-                <span className="ml-1.5 rounded-full bg-accent px-1.5 text-xs font-bold text-abyss">
-                  {incoming}
-                </span>
-              )}
-            </NavLink>
-            {user?.isAdmin && (
-              <NavLink to="/admin" className={navCls}>
-                Admin
-                {pendingGames > 0 && (
-                  <span className="ml-1.5 rounded-full bg-amber-400 px-1.5 text-xs font-bold text-abyss">
-                    {pendingGames}
-                  </span>
-                )}
-              </NavLink>
-            )}
+          <nav className="hidden h-full items-center gap-1 md:flex">
+            {navLinks(navCls)}
           </nav>
 
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2 sm:gap-3">
             {backend.mode === 'local' && (
               <span
-                className="rounded border border-amber-500/30 px-1.5 py-0.5 text-[11px] text-amber-400/90"
+                className="hidden rounded border border-amber-500/30 px-1.5 py-0.5 text-[11px] text-amber-400/90 sm:inline"
                 title="Firebase non configuré — données dans ce navigateur uniquement"
               >
                 LOCAL
@@ -95,13 +139,13 @@ export function Shell() {
             <div className="relative">
               <button
                 onClick={() => setMenuOpen((v) => !v)}
-                className="flex items-center gap-2 rounded-md px-2 py-1 transition hover:bg-panel-2"
+                className="flex items-center gap-2 rounded-md px-1 py-1 transition hover:bg-panel-2 sm:px-2"
               >
                 <Avatar user={user ?? undefined} size="sm" />
-                <span className="text-sm font-medium">{user?.displayName}</span>
+                <span className="hidden text-sm font-medium sm:inline">{user?.displayName}</span>
                 {myPlaying && (
                   <span
-                    className="max-w-28 truncate text-xs text-emerald-400"
+                    className="hidden max-w-28 truncate text-xs text-emerald-400 sm:inline"
                     title={`En train de jouer à ${myPlaying.title}`}
                   >
                     🎮 {myPlaying.title}
@@ -158,9 +202,19 @@ export function Shell() {
             </div>
           </div>
         </div>
+
+        {/* Mobile nav drawer */}
+        {navOpen && (
+          <>
+            <div className="fixed inset-0 top-14 z-30 md:hidden" onClick={() => setNavOpen(false)} />
+            <nav className="relative z-40 space-y-0.5 border-t border-edge bg-abyss/95 px-3 py-3 backdrop-blur md:hidden">
+              {navLinks(mobileNavCls, () => setNavOpen(false))}
+            </nav>
+          </>
+        )}
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:py-8">
         <Outlet />
       </main>
 
