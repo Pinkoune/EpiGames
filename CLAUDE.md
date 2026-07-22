@@ -98,6 +98,13 @@ friendships/{a_b}    id = paire uid triée, users[2], requestedBy, status(pendin
   en carte cliquable (cover + « Rejoindre ») ; la liste d'amis et la cloche le
   reformulent en texte lisible. Un client qui ne le rendrait pas affiche quand
   même quelque chose d'intelligible.
+- **Deux rendus de chat** (`ChatChannel`, branché sur `isDmScope`) : les salons
+  PUBLICS gardent la liste plate menée par l'avatar (l'alignement gauche/droite
+  n'a pas de sens à plusieurs) ; les MP passent en **bulles** façon messagerie,
+  les tiennes à droite teintées avec ton `profileAccent` (texte `text-abyss`,
+  même contrat que les boutons `bg-accent`). Les cartes d'invitation restent
+  HORS de la teinte pour que leur identité verte reste lisible quel que soit
+  l'accent choisi.
 - **Markdown** : descriptions de jeu et de demande rendues via `components/Markdown.tsx`
   (marked + DOMPurify, GFM, liens en target _blank). Chat et commentaires restent
   en texte brut.
@@ -223,13 +230,18 @@ En mode local : premier utilisateur créé = admin (pratique pour tester).
   masqué tant qu'aucun jeu de ce kind n'existe, ex. « Sur le portail » avant
   le premier jeu embedded) ; tags dans un menu déroulant ; ligne d'aide
   « Propose-le depuis ta page profil » pointant vers le profil du membre.
-- **Amis** (/friends) : hub social, pas un annuaire. Colonne gauche =
-  demandes reçues + liste d'amis SÉLECTIONNABLE (tri : non-lus, puis en ligne,
-  puis message le plus récent) + ajout de membres. Colonne droite, deux modes :
-  - *aucun ami sélectionné* → « Tes amis y jouent, pas toi » (suggestions) puis
-    le **fil d'activité** des amis ;
-  - *ami sélectionné* → la conversation privée (`ChatChannel` sur le scope DM),
-    avec « ▶ Rejoindre » vers son jeu en cours et « 🎮 Inviter ».
+- **Amis** (/friends) : hub social, pas un annuaire. **Trois colonnes** :
+  - *gauche* : demandes reçues + liste d'amis + ajout de membres. Cliquer un ami
+    ouvre sa **fiche** (`components/friends/FriendModal.tsx`) — dernier jeu joué
+    et quand, dernière connexion (date+heure), membre depuis, puis les actions :
+    message, invitation (sélecteur de jeu intégré), profil, retrait (confirmé).
+    Cliquer n'ouvre PAS la conversation directement : la fiche est le hub d'actions.
+  - *milieu* : « Conversations » — les fils avec au moins un message, triés par
+    récence, avec aperçu et non-lus ; en ouvrir un remplace la liste par la
+    conversation (`ChatChannel` sur le scope DM) avec « ▶ Rejoindre » et
+    « 🎮 Inviter », et « ← Conversations » pour revenir.
+  - *droite* (étroite) : « Ils y jouent, pas toi » (3 suggestions) + le fil
+    d'activité des amis (15 entrées, format compact).
 
   Sur mobile, la colonne gauche est un tiroir (même motif que le forum).
 - **Activité & suggestions** (`lib/activity.ts`, fonctions PURES) : `buildFriendActivity`

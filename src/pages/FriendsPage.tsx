@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChatChannel } from '../components/forum/ChatChannel'
+import { FriendModal } from '../components/friends/FriendModal'
 import { Avatar, SectionLabel, btnGhost, btnPrimary, inputCls } from '../components/ui'
 import { backend } from '../lib/backend'
 import { buildFriendActivity, buildSuggestions } from '../lib/activity'
@@ -23,9 +24,7 @@ import { useUsersStore } from '../stores/usersStore'
 /** Compact preview line for a conversation ("Toi : salut"). */
 function previewOf(text: string, mine: boolean, gameTitle?: string): string {
   // Invite markers are machine-readable; show something human here.
-  const raw = parseInvite(text)
-    ? `🎮 Invitation — ${gameTitle ?? 'un jeu'}`
-    : text
+  const raw = parseInvite(text) ? `🎮 Invitation — ${gameTitle ?? 'un jeu'}` : text
   const body = raw.length > 38 ? `${raw.slice(0, 38)}…` : raw
   return mine ? `Toi : ${body}` : body
 }
@@ -37,7 +36,10 @@ export function FriendsPage() {
   const setPlaying = usePresenceStore((s) => s.setPlaying)
   const { friendships, sendRequest, accept, remove } = useFriendsStore()
   const [search, setSearch] = useState('')
+  /** Conversation currently open in the middle column. */
   const [selectedUid, setSelectedUid] = useState<string | null>(null)
+  /** Friend whose card modal is open (clicking a friend opens this, not the chat). */
+  const [modalUid, setModalUid] = useState<string | null>(null)
   // Mobile: the friend list is a drawer so the conversation gets the screen.
   const [listOpen, setListOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
@@ -53,16 +55,13 @@ export function FriendsPage() {
   // Activity + suggestions: one launch-history subscription set covering me
   // AND my friends, plus the request data the portal already watches.
   const games = useGamesStore((s) => s.games)
-  const playsUids = useMemo(
-    () => (me ? [me, ...friendUids] : []),
-    [me, friendUids],
-  )
+  const playsUids = useMemo(() => (me ? [me, ...friendUids] : []), [me, friendUids])
   const playsMap = usePlaysMap(playsUids)
   const { requestsMap } = useAllScopeData(games)
   const canSee = useCallback((g: Game) => canSeeGame(user, g), [user])
 
   const activity = useMemo(
-    () => buildFriendActivity({ friendUids, playsMap, requestsMap, games, canSee }),
+    () => buildFriendActivity({ friendUids, playsMap, requestsMap, games, canSee, limit: 15 }),
     [friendUids, playsMap, requestsMap, games, canSee],
   )
   const suggestions = useMemo(
@@ -73,6 +72,7 @@ export function FriendsPage() {
         myPlays: playsMap[me] ?? [],
         games,
         canSee,
+        limit: 3,
       }),
     [friendUids, playsMap, me, games, canSee],
   )
@@ -112,6 +112,11 @@ export function FriendsPage() {
     return (users[a]?.displayName ?? '').localeCompare(users[b]?.displayName ?? '')
   })
 
+  // Conversations = friends you've actually exchanged something with.
+  const conversations = dms
+    .filter((d) => d.lastMessage)
+    .sort((a, b) => (b.lastMessage?.createdAt ?? 0) - (a.lastMessage?.createdAt ?? 0))
+
   const selected = selectedUid ? dmOf(selectedUid) : undefined
 
   // Opening a conversation marks it read. Writing `seenChats` refreshes the
@@ -131,15 +136,24 @@ export function FriendsPage() {
 
   const openConversation = (uid: string) => {
     setSelectedUid(uid)
+    setModalUid(null)
     setListOpen(false)
+  }
+
+  const sendInvite = (toUid: string, gameId: string) => {
+    void backend.sendChatMessage(dmScopeId(me, toUid), me, inviteMessage(gameId))
+    setModalUid(null)
+    setInviteOpen(false)
+    setSelectedUid(toUid)
   }
 
   const selectedProfile = selectedUid ? users[selectedUid] : undefined
   const selectedPresence = selectedUid ? presence[selectedUid] : undefined
   const selectedPlaying = selectedPresence?.online ? selectedPresence.playing : null
+  const modalProfile = modalUid ? users[modalUid] : undefined
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+    <div className="grid gap-6 lg:grid-cols-[260px_1fr_260px]">
       {/* Mobile drawer toggle */}
       <button
         onClick={() => setListOpen((v) => !v)}
@@ -148,9 +162,7 @@ export function FriendsPage() {
       >
         <span className="min-w-0 truncate">
           <span className="text-ink-dim">Amis — </span>
-          <span className="font-medium">
-            {selectedProfile?.displayName ?? `${friendUids.length} ami(s)`}
-          </span>
+          <span className="font-medium">{friendUids.length} ami(s)</span>
           {totalUnread > 0 && (
             <span className="ml-2 rounded-full bg-accent px-1.5 text-xs font-bold text-abyss">
               {totalUnread}
@@ -160,6 +172,7 @@ export function FriendsPage() {
         <span className="shrink-0 text-ink-dim">{listOpen ? '▲' : '▼'}</span>
       </button>
 
+      {/* ---------- left: friends & requests ---------- */}
       <aside className={`${listOpen ? 'block' : 'hidden'} space-y-6 lg:block`}>
         {myPresence?.playing && (
           <p className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-400">
@@ -188,12 +201,13 @@ export function FriendsPage() {
               {incoming.map((f) => {
                 const other = f.users[0] === me ? f.users[1] : f.users[0]
                 return (
-                  <div
-                    key={f.id}
-                    className="rounded-lg border border-accent/30 bg-accent/5 p-3"
-                  >
+                  <div key={f.id} className="rounded-lg border border-accent/30 bg-accent/5 p-3">
                     <div className="flex items-center gap-2">
-                      <Avatar user={users[other]} size="sm" online={presence[other]?.online ?? false} />
+                      <Avatar
+                        user={users[other]}
+                        size="sm"
+                        online={presence[other]?.online ?? false}
+                      />
                       <span className="min-w-0 truncate text-sm font-semibold">
                         {users[other]?.displayName ?? '???'}
                       </span>
@@ -220,14 +234,9 @@ export function FriendsPage() {
         )}
 
         <section>
-          <h2 className="text-sm font-bold tracking-wide text-ink-dim uppercase">
+          <h2 className="mb-2 text-sm font-bold tracking-wide text-ink-dim uppercase">
             Mes amis ({friendUids.length})
           </h2>
-          {friendUids.length > 0 && (
-            <p className="mb-2 text-xs text-ink-dim/70">
-              Clique sur un ami pour lui écrire en privé 💬
-            </p>
-          )}
           {sortedFriends.length === 0 ? (
             <p className="rounded-lg border border-dashed border-edge p-4 text-center text-sm text-ink-dim">
               Pas encore d'amis — ajoute quelqu'un depuis la liste des membres, en
@@ -239,16 +248,11 @@ export function FriendsPage() {
                 const p = presence[uid]
                 const playing = p?.online ? p.playing : null
                 const dm = dmOf(uid)
-                const active = selectedUid === uid
                 return (
                   <button
                     key={uid}
-                    onClick={() => openConversation(uid)}
-                    className={`flex w-full items-center gap-2.5 rounded-md border p-2 text-left transition ${
-                      active
-                        ? 'border-accent/50 bg-accent/10'
-                        : 'border-transparent hover:bg-panel-2'
-                    }`}
+                    onClick={() => setModalUid(uid)}
+                    className="flex w-full items-center gap-2.5 rounded-md border border-transparent p-2 text-left transition hover:bg-panel-2"
                   >
                     <Avatar user={users[uid]} size="sm" online={p?.online ?? false} />
                     <span className="min-w-0 flex-1">
@@ -256,33 +260,16 @@ export function FriendsPage() {
                         {users[uid]?.displayName ?? '???'}
                       </span>
                       <span className="block truncate text-xs text-ink-dim">
-                        {dm?.lastMessage
-                          ? previewOf(
-                              dm.lastMessage.text,
-                              dm.lastMessage.authorUid === me,
-                              gameTitle(parseInvite(dm.lastMessage.text) ?? ''),
-                            )
-                          : playing
-                            ? `🎮 ${playing.title}`
-                            : p?.online
-                              ? 'En ligne'
-                              : 'Hors ligne'}
+                        {playing
+                          ? `🎮 ${playing.title}`
+                          : p?.online
+                            ? 'En ligne'
+                            : 'Hors ligne'}
                       </span>
                     </span>
-                    {/* Always show the "write to them" affordance, so the row
-                        never reads as a plain directory entry. */}
-                    {dm && dm.unread > 0 ? (
+                    {dm && dm.unread > 0 && (
                       <span className="shrink-0 rounded-full bg-accent px-1.5 text-xs font-bold text-abyss">
                         {dm.unread}
-                      </span>
-                    ) : (
-                      <span
-                        className={`shrink-0 text-sm transition ${
-                          active ? 'text-accent' : 'text-ink-dim/40'
-                        }`}
-                        title="Ouvrir la conversation"
-                      >
-                        💬
                       </span>
                     )}
                   </button>
@@ -352,128 +339,91 @@ export function FriendsPage() {
         </section>
       </aside>
 
-      {/* Conversation pane */}
+      {/* ---------- middle: conversations ---------- */}
       <div className="min-w-0">
         {!selectedUid || !selectedProfile ? (
-          <div className="space-y-8">
-            {/* "Ils y jouent, pas toi" — pure discovery, from friends' history. */}
-            {suggestions.length > 0 && (
-              <section>
-                <SectionLabel>Tes amis y jouent, pas toi</SectionLabel>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {suggestions.map(({ game, friendUids: who }) => (
-                    <Link
-                      key={game.id}
-                      to={`/game/${game.id}`}
-                      className="flex items-center gap-3 rounded-lg border border-edge bg-panel p-3 transition hover:border-accent/50"
+          <section>
+            <SectionLabel>Conversations</SectionLabel>
+            {conversations.length === 0 ? (
+              <div className="flex h-64 flex-col items-center justify-center rounded-lg border border-dashed border-edge text-center text-ink-dim">
+                <p className="text-4xl opacity-30">💬</p>
+                <p className="mt-3 px-6 text-sm">
+                  {friendUids.length === 0
+                    ? 'Ajoute un ami pour lui écrire.'
+                    : 'Aucune conversation — ouvre la fiche d’un ami pour lui écrire.'}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {conversations.map((dm) => {
+                  const last = dm.lastMessage!
+                  return (
+                    <button
+                      key={dm.scopeId}
+                      onClick={() => openConversation(dm.friendUid)}
+                      className="flex w-full items-center gap-3 rounded-lg border border-edge bg-panel p-3 text-left transition hover:border-accent/50"
                     >
-                      <div
-                        className="aspect-video w-24 shrink-0 rounded border border-edge bg-cover bg-center"
-                        style={
-                          game.coverUrl
-                            ? { backgroundImage: `url(${game.coverUrl})` }
-                            : { background: coverFallback(game.id) }
-                        }
+                      <Avatar
+                        user={users[dm.friendUid]}
+                        online={presence[dm.friendUid]?.online ?? false}
                       />
-                      <div className="min-w-0">
-                        <p className="truncate font-display font-semibold">{game.title}</p>
-                        <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-dim">
-                          {who.slice(0, 3).map((uid) => (
-                            <Avatar key={uid} user={users[uid]} size="sm" />
-                          ))}
-                          <span className="ml-1 truncate">
-                            {who.length === 1
-                              ? `${users[who[0]]?.displayName ?? '???'} y joue`
-                              : `${who.length} amis y jouent`}
-                          </span>
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            <section>
-              <SectionLabel>Activité de tes amis</SectionLabel>
-              {activity.length === 0 ? (
-                <div className="flex h-64 flex-col items-center justify-center rounded-lg border border-dashed border-edge text-center text-ink-dim">
-                  <p className="text-4xl opacity-30">💬</p>
-                  <p className="mt-3 text-sm">
-                    {friendUids.length === 0
-                      ? 'Ajoute un ami pour voir son activité et lui écrire.'
-                      : 'Rien à afficher — choisis un ami pour lui écrire.'}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {activity.map((item) => (
-                    <Link
-                      key={item.id}
-                      to={item.to}
-                      className="flex items-center gap-3 rounded-md border border-edge bg-panel px-3 py-2 text-sm transition hover:border-edge-2"
-                    >
-                      <Avatar user={users[item.uid]} size="sm" />
                       <span className="min-w-0 flex-1">
-                        <span className="font-medium">
-                          {users[item.uid]?.displayName ?? '???'}
-                        </span>{' '}
-                        {item.kind === 'play' && (
-                          <>
-                            a joué à{' '}
-                            <span className="text-emerald-400">{item.gameTitle}</span>
-                          </>
-                        )}
-                        {item.kind === 'publish' && (
-                          <>
-                            a publié <span className="text-accent">{item.gameTitle}</span> 🚀
-                          </>
-                        )}
-                        {item.kind === 'request' && (
-                          <>
-                            {item.requestType === 'bug'
-                              ? 'a signalé un bug sur '
-                              : 'a proposé une feature sur '}
-                            <span className="text-ink">{item.gameTitle}</span>
-                            <span className="block truncate text-xs text-ink-dim">
-                              {item.requestType === 'bug' ? '●' : '◆'} {item.requestTitle}
-                            </span>
-                          </>
-                        )}
+                        <span className="flex items-baseline gap-2">
+                          <span className="min-w-0 truncate font-medium">
+                            {users[dm.friendUid]?.displayName ?? '???'}
+                          </span>
+                          <span className="ml-auto shrink-0 text-xs text-ink-dim">
+                            {relativeTime(last.createdAt)}
+                          </span>
+                        </span>
+                        <span
+                          className={`block truncate text-sm ${
+                            dm.unread > 0 ? 'font-medium text-ink' : 'text-ink-dim'
+                          }`}
+                        >
+                          {previewOf(
+                            last.text,
+                            last.authorUid === me,
+                            gameTitle(parseInvite(last.text) ?? ''),
+                          )}
+                        </span>
                       </span>
-                      <span className="shrink-0 text-xs text-ink-dim">
-                        {relativeTime(item.at)}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
+                      {dm.unread > 0 && (
+                        <span className="shrink-0 rounded-full bg-accent px-1.5 text-xs font-bold text-abyss">
+                          {dm.unread}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </section>
         ) : (
           <>
             <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-edge bg-panel px-3 py-2.5">
-              <Avatar
-                user={selectedProfile}
-                online={selectedPresence?.online ?? false}
-              />
-              <div className="min-w-0">
-                <Link
-                  to={`/profile/${selectedUid}`}
-                  className="font-display font-semibold hover:text-accent hover:underline"
-                >
-                  {selectedProfile.displayName}
-                </Link>
-                <p className="text-xs text-ink-dim">
-                  {selectedPlaying ? (
-                    <span className="text-emerald-400">🎮 {selectedPlaying.title}</span>
-                  ) : selectedPresence?.online ? (
-                    'En ligne'
-                  ) : (
-                    'Hors ligne'
-                  )}
-                </p>
-              </div>
+              <button
+                onClick={() => setModalUid(selectedUid)}
+                className="flex min-w-0 items-center gap-3 text-left"
+                title="Voir la fiche"
+              >
+                <Avatar user={selectedProfile} online={selectedPresence?.online ?? false} />
+                <span className="min-w-0">
+                  <span className="block truncate font-display font-semibold">
+                    {selectedProfile.displayName}
+                  </span>
+                  <span className="block text-xs text-ink-dim">
+                    {selectedPlaying ? (
+                      <span className="text-emerald-400">🎮 {selectedPlaying.title}</span>
+                    ) : selectedPresence?.online ? (
+                      'En ligne'
+                    ) : (
+                      'Hors ligne'
+                    )}
+                  </span>
+                </span>
+              </button>
+
               <div className="ml-auto flex items-center gap-2">
                 {/* The point of seeing "playing" at all: go join them. */}
                 {selectedPlaying && (
@@ -484,6 +434,14 @@ export function FriendsPage() {
                     ▶ Rejoindre
                   </Link>
                 )}
+
+                <button
+                  onClick={() => setSelectedUid(null)}
+                  className="text-xs text-ink-dim transition hover:text-ink"
+                  title="Revenir aux conversations"
+                >
+                  ← Conversations
+                </button>
 
                 {/* Invite: an ordinary DM carrying an invite marker, so it
                     rides the existing unread + notification path. */}
@@ -496,10 +454,7 @@ export function FriendsPage() {
                   </button>
                   {inviteOpen && (
                     <>
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setInviteOpen(false)}
-                      />
+                      <div className="fixed inset-0 z-40" onClick={() => setInviteOpen(false)} />
                       <div className="absolute right-0 z-50 mt-2 max-h-72 w-60 overflow-y-auto rounded-lg border border-edge bg-panel py-1 shadow-2xl">
                         {invitableGames.length === 0 ? (
                           <p className="px-3 py-2 text-xs text-ink-dim">
@@ -509,14 +464,7 @@ export function FriendsPage() {
                           invitableGames.map((g) => (
                             <button
                               key={g.id}
-                              onClick={() => {
-                                setInviteOpen(false)
-                                void backend.sendChatMessage(
-                                  dmScopeId(me, selectedUid),
-                                  me,
-                                  inviteMessage(g.id),
-                                )
-                              }}
+                              onClick={() => sendInvite(selectedUid, g.id)}
                               className="block w-full truncate px-3 py-2 text-left text-sm transition hover:bg-panel-2"
                             >
                               {g.id === myPresence?.playing?.gameId && (
@@ -530,25 +478,6 @@ export function FriendsPage() {
                     </>
                   )}
                 </div>
-
-                <button
-                  onClick={() => setSelectedUid(null)}
-                  className="text-xs text-ink-dim transition hover:text-ink"
-                  title="Revenir à l'activité"
-                >
-                  ← Activité
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirm(`Retirer ${selectedProfile.displayName} de tes amis ?`)) {
-                      void remove(friendshipId(me, selectedUid))
-                      setSelectedUid(null)
-                    }
-                  }}
-                  className="text-xs text-ink-dim transition hover:text-rose-400"
-                >
-                  Retirer
-                </button>
               </div>
             </div>
 
@@ -560,6 +489,107 @@ export function FriendsPage() {
           </>
         )}
       </div>
+
+      {/* ---------- right: discovery & activity ---------- */}
+      <aside className="min-w-0 space-y-6">
+        {suggestions.length > 0 && (
+          <section>
+            <SectionLabel>Ils y jouent, pas toi</SectionLabel>
+            <div className="space-y-1.5">
+              {suggestions.map(({ game, friendUids: who }) => (
+                <Link
+                  key={game.id}
+                  to={`/game/${game.id}`}
+                  className="flex items-center gap-2 rounded-md border border-edge bg-panel p-2 transition hover:border-accent/50"
+                >
+                  <div
+                    className="aspect-video w-14 shrink-0 rounded border border-edge bg-cover bg-center"
+                    style={
+                      game.coverUrl
+                        ? { backgroundImage: `url(${game.coverUrl})` }
+                        : { background: coverFallback(game.id) }
+                    }
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{game.title}</p>
+                    <p className="truncate text-xs text-ink-dim">
+                      {who.length === 1
+                        ? `${users[who[0]]?.displayName ?? '???'} y joue`
+                        : `${who.length} amis y jouent`}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section>
+          <SectionLabel>Activité de tes amis</SectionLabel>
+          {activity.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-edge p-4 text-center text-xs text-ink-dim">
+              Rien pour l'instant.
+            </p>
+          ) : (
+            <div className="space-y-1">
+              {activity.map((item) => (
+                <Link
+                  key={item.id}
+                  to={item.to}
+                  className="flex items-start gap-2 rounded-md px-2 py-1.5 text-xs transition hover:bg-panel-2"
+                >
+                  <Avatar user={users[item.uid]} size="sm" />
+                  <span className="min-w-0 flex-1">
+                    <span className="font-medium">
+                      {users[item.uid]?.displayName ?? '???'}
+                    </span>{' '}
+                    {item.kind === 'play' && (
+                      <>
+                        a joué à <span className="text-emerald-400">{item.gameTitle}</span>
+                      </>
+                    )}
+                    {item.kind === 'publish' && (
+                      <>
+                        a publié <span className="text-accent">{item.gameTitle}</span> 🚀
+                      </>
+                    )}
+                    {item.kind === 'request' && (
+                      <>
+                        {item.requestType === 'bug'
+                          ? 'a signalé un bug sur '
+                          : 'a proposé une feature sur '}
+                        <span className="text-ink">{item.gameTitle}</span>
+                      </>
+                    )}
+                    <span className="mt-0.5 block text-[11px] text-ink-dim">
+                      {relativeTime(item.at)}
+                    </span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+      </aside>
+
+      {modalUid && modalProfile && (
+        <FriendModal
+          profile={modalProfile}
+          presence={presence[modalUid]}
+          lastPlay={playsMap[modalUid]?.[0]}
+          games={games}
+          invitableGames={invitableGames}
+          playingGameId={myPresence?.playing?.gameId}
+          onClose={() => setModalUid(null)}
+          onMessage={() => openConversation(modalUid)}
+          onInvite={(gameId) => sendInvite(modalUid, gameId)}
+          onRemove={() => {
+            void remove(friendshipId(me, modalUid))
+            if (selectedUid === modalUid) setSelectedUid(null)
+            setModalUid(null)
+          }}
+        />
+      )}
     </div>
   )
 }
