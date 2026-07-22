@@ -2,6 +2,9 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { backend } from '../../lib/backend'
 import { useChat } from '../../lib/hooks'
+import { coverFallback } from '../../lib/cover'
+import { isDmScope, parseInvite } from '../../lib/types'
+import { useGamesStore } from '../../stores/gamesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { useUsersStore, displayNameOf } from '../../stores/usersStore'
 import { Avatar, inputCls } from '../ui'
@@ -20,6 +23,7 @@ function formatTime(ts: number): string {
 export function ChatChannel({ scopeId, placeholder }: { scopeId: string; placeholder: string }) {
   const user = useAuthStore((s) => s.user)
   const users = useUsersStore((s) => s.users)
+  const games = useGamesStore((s) => s.games)
   const messages = useChat(scopeId)
   const [text, setText] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -29,6 +33,10 @@ export function ChatChannel({ scopeId, placeholder }: { scopeId: string; placeho
   }, [messages.length])
 
   if (!user) return null
+
+  // Admins moderate public channels, but a private conversation is nobody
+  // else's business — firestore.rules enforces the same boundary.
+  const canModerate = user.isAdmin && !isDmScope(scopeId)
 
   async function send(e: FormEvent) {
     e.preventDefault()
@@ -67,9 +75,48 @@ export function ChatChannel({ scopeId, placeholder }: { scopeId: string; placeho
                     <span className="ml-2 text-xs text-ink-dim">{formatTime(m.createdAt)}</span>
                   </p>
                 )}
-                <p className="text-sm break-words whitespace-pre-wrap text-ink/90">{m.text}</p>
+                {(() => {
+                  const invitedGameId = parseInvite(m.text)
+                  if (!invitedGameId) {
+                    return (
+                      <p className="text-sm break-words whitespace-pre-wrap text-ink/90">
+                        {m.text}
+                      </p>
+                    )
+                  }
+                  const game = games.find((g) => g.id === invitedGameId)
+                  if (!game) {
+                    return (
+                      <p className="text-sm text-ink-dim italic">
+                        Invitation à un jeu introuvable.
+                      </p>
+                    )
+                  }
+                  return (
+                    <Link
+                      to={`/game/${game.id}`}
+                      className="mt-0.5 flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2.5 transition hover:border-emerald-400/60"
+                    >
+                      <div
+                        className="hidden aspect-video w-20 shrink-0 rounded border border-edge bg-cover bg-center sm:block"
+                        style={
+                          game.coverUrl
+                            ? { backgroundImage: `url(${game.coverUrl})` }
+                            : { background: coverFallback(game.id) }
+                        }
+                      />
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold tracking-wide text-emerald-400 uppercase">
+                          🎮 Invitation à jouer
+                        </p>
+                        <p className="truncate font-display font-semibold">{game.title}</p>
+                        <p className="text-xs text-accent">Rejoindre →</p>
+                      </div>
+                    </Link>
+                  )
+                })()}
               </div>
-              {(m.authorUid === user.uid || user.isAdmin) && (
+              {(m.authorUid === user.uid || canModerate) && (
                 <button
                   onClick={() => void backend.deleteChatMessage(scopeId, m.id)}
                   className="text-xs text-ink-dim opacity-0 transition group-hover:opacity-100 hover:text-rose-400"

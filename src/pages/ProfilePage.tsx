@@ -5,7 +5,8 @@ import { GameFormModal } from '../components/games/GameFormModal'
 import { GameCard } from '../components/library/GameCard'
 import { Avatar, SectionLabel, btnGhost, btnPrimary } from '../components/ui'
 import { coverFallback } from '../lib/cover'
-import { useMetaProfile } from '../lib/hooks'
+import { relativeTime } from '../lib/format'
+import { useAllScopeData, useUserStats } from '../lib/hooks'
 import {
   resolveProfileAccent,
   resolveProfileBackground,
@@ -19,20 +20,6 @@ import { useFriendsStore } from '../stores/friendsStore'
 import { canSeeGame, useGamesStore } from '../stores/gamesStore'
 import { usePresenceStore } from '../stores/presenceStore'
 import { useUsersStore } from '../stores/usersStore'
-
-/** Compact FR relative time ("il y a 3 h", "hier", "il y a 5 j"). */
-function relativeTime(ts: number): string {
-  const diff = Date.now() - ts
-  const min = Math.floor(diff / 60_000)
-  if (min < 1) return "à l'instant"
-  if (min < 60) return `il y a ${min} min`
-  const h = Math.floor(min / 60)
-  if (h < 24) return `il y a ${h} h`
-  const d = Math.floor(h / 24)
-  if (d === 1) return 'hier'
-  if (d < 30) return `il y a ${d} j`
-  return new Date(ts).toLocaleDateString('fr-FR')
-}
 
 function StatTile({ value, label }: { value: number | string; label: string }) {
   return (
@@ -59,8 +46,17 @@ export function ProfilePage() {
   const isSelf = Boolean(me && uid && me.uid === uid)
 
   // Everything the badges and activity lists derive from (shared with the
-  // profile editor, which uses the same stats to gate earned titles).
-  const { stats, requests: theirRequests, plays } = useMetaProfile(uid, games)
+  // profile editor, which uses the same stats to gate earned titles). The
+  // global scope data is fetched ONCE and narrowed to two members, so the
+  // "you vs them" comparison below costs no extra chat/request subscriptions.
+  const { requestsMap, chatMap } = useAllScopeData(games)
+  const { stats, requests: theirRequests, plays } = useUserStats(
+    uid,
+    games,
+    requestsMap,
+    chatMap,
+  )
+  const { stats: myStats } = useUserStats(me?.uid, games, requestsMap, chatMap)
 
   if (!uid || !profile) {
     return (
@@ -84,6 +80,12 @@ export function ProfilePage() {
     (a, b) => Number(b.earned) - Number(a.earned),
   )
   const earnedCount = achievements.filter((a) => a.earned).length
+
+  // "You vs them" — only meaningful on someone else's profile.
+  const compare = Boolean(me) && !isSelf
+  const myEarned = computeMetaAchievements(myStats).filter((a) => a.earned)
+  const myEarnedIds = new Set(myEarned.map((a) => a.def.id))
+  const myEarnedCount = myEarned.length
 
   const relation = me ? myFriendships.find((f) => f.id === friendshipId(me.uid, uid)) : undefined
 
@@ -223,31 +225,50 @@ export function ProfilePage() {
       <section className="mt-8">
         <SectionLabel>
           Succès ({earnedCount}/{achievements.length})
+          {compare && (
+            <span className="ml-2 normal-case tracking-normal text-ink-dim">
+              — toi : {myEarnedCount}/{achievements.length}
+            </span>
+          )}
         </SectionLabel>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {achievements.map(({ def, value, earned }) => (
-            <div
-              key={def.id}
-              title={def.description}
-              className={`flex items-center gap-3 rounded-lg border p-3 transition ${
-                earned
-                  ? 'border-amber-500/30 bg-amber-500/5'
-                  : 'border-edge bg-panel opacity-60'
-              }`}
-            >
-              <span className={`text-2xl ${earned ? '' : 'grayscale'}`}>{def.icon}</span>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{def.title}</p>
-                {earned ? (
-                  <p className="truncate text-xs text-amber-400/90">Débloqué</p>
-                ) : (
-                  <p className="truncate text-xs text-ink-dim">
-                    {Math.min(value, def.goal)} / {def.goal}
-                  </p>
+          {achievements.map(({ def, value, earned }) => {
+            const iHaveIt = myEarnedIds.has(def.id)
+            return (
+              <div
+                key={def.id}
+                title={def.description}
+                className={`flex items-center gap-3 rounded-lg border p-3 transition ${
+                  earned
+                    ? 'border-amber-500/30 bg-amber-500/5'
+                    : 'border-edge bg-panel opacity-60'
+                }`}
+              >
+                <span className={`text-2xl ${earned ? '' : 'grayscale'}`}>{def.icon}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{def.title}</p>
+                  {earned ? (
+                    <p className="truncate text-xs text-amber-400/90">Débloqué</p>
+                  ) : (
+                    <p className="truncate text-xs text-ink-dim">
+                      {Math.min(value, def.goal)} / {def.goal}
+                    </p>
+                  )}
+                </div>
+                {/* Comparison marker, only when viewing someone else. */}
+                {compare && (
+                  <span
+                    className={`shrink-0 text-xs font-semibold ${
+                      iHaveIt ? 'text-emerald-400' : 'text-ink-dim/60'
+                    }`}
+                    title={iHaveIt ? 'Tu l’as aussi' : 'Tu ne l’as pas encore'}
+                  >
+                    {iHaveIt ? '✓ toi' : '— toi'}
+                  </span>
                 )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </section>
 

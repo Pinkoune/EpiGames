@@ -63,6 +63,8 @@ export interface Backend {
   updateProfile(uid: string, patch: Partial<EditableProfile>): Promise<void>
   /** Dismiss a game's update announcement ("j'ai vu") for this user. */
   setSeenUpdate(uid: string, gameId: string, publishedAt: number): Promise<void>
+  /** Mark a chat scope read up to `lastAt` (drives DM unread badges). */
+  setSeenChat(uid: string, scopeId: string, lastAt: number): Promise<void>
 
   // ---- users (small trusted group: watch them all) ----
   watchUsers(cb: (users: UserProfile[]) => void): Unsubscribe

@@ -204,6 +204,7 @@ export class LocalBackend implements Backend {
           profileTitle: 'none',
           profileAccent: 'default',
           favoriteGameId: '',
+          seenChats: {},
         })
       }
     })
@@ -234,6 +235,16 @@ export class LocalBackend implements Backend {
       const u = db.users.find((x) => x.uid === targetUid)
       if (u) {
         u.seenUpdates = { ...(u.seenUpdates ?? {}), [gameId]: publishedAt }
+      }
+    })
+    this.emitAuth()
+  }
+
+  async setSeenChat(targetUid: string, scopeId: string, lastAt: number): Promise<void> {
+    this.mutate((db) => {
+      const u = db.users.find((x) => x.uid === targetUid)
+      if (u) {
+        u.seenChats = { ...(u.seenChats ?? {}), [scopeId]: lastAt }
       }
     })
     this.emitAuth()

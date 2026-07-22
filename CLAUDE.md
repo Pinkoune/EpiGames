@@ -46,7 +46,11 @@ sinon local. Config via `.env` (voir `.env.example`).
 users/{uid}          displayName, avatar (emoji | URL Google | data URL 128px | URL externe/GIF),
                      bio, isAdmin, createdAt, seenUpdates{gameId:ts}, linkedUids,
                      profileFrame (preset contour d'avatar), profileBackground
-                     (preset ou URL — bannière de la page profil)
+                     (preset ou URL — bannière de la page profil), profileTitle
+                     (titre affiché, la plupart débloqués par méta-succès),
+                     profileAccent (couleur de la page profil), favoriteGameId
+                     (jeu vitrine épinglé), seenChats{scopeId:ts} (dernier
+                     message lu par salon — sert aux non-lus des MP)
 games/{gameId}       title, tagline, description (longue, page façon itch.io),
                      kind(web|download|embedded), coverUrl, screenshots[], launchUrl,
                      downloadUrl (bouton téléchargement optionnel des jeux embedded),
@@ -64,7 +68,8 @@ games/{gameId}       title, tagline, description (longue, page façon itch.io),
 users/{uid}/plays/{id}   gameId, title, at — historique de lancements (loggé au
                      lancement, immuable ; owner écrit, tout membre lit)
 chats/{scopeId}/messages/{id}   authorUid, text, createdAt
-                     scopeId = '_portal' (Général du portail) ou un gameId (Général du jeu)
+                     scopeId = '_portal' (Général du portail), un gameId (Général
+                     du jeu), ou 'dm_<uidA>_<uidB>' (paire triée) = message privé
 friendships/{a_b}    id = paire uid triée, users[2], requestedBy, status(pending|accepted)
 ```
 
@@ -74,6 +79,25 @@ friendships/{a_b}    id = paire uid triée, users[2], requestedBy, status(pendin
   Les demandes DU PORTAIL vivent sous le scope sentinel `PORTAL_SCOPE = '_portal'`
   (`games/_portal/requests/...`, doc parent inexistant — les règles gardent
   `gameId != '_portal'` avant tout `get()` du parent ; triage portail = admin).
+- **Messages privés** : PAS un nouveau modèle — un MP est la collection
+  `chats` générique sous le scope `dmScopeId(a,b)` = `dm_<uidA>_<uidB>`
+  (paire triée, `lib/types.ts`), donc `watchChat`/`sendChatMessage` et le
+  composant `ChatChannel` sont réutilisés tels quels. Les participants sont
+  encodés DANS l'id du scope : les règles les ré-extraient
+  (`request.auth.uid in scopeId.split('_')`) pour interdire la lecture aux
+  autres, sans `get()` supplémentaire. Un admin modère les salons publics
+  mais PAS les MP (règles + UI alignées). Les non-lus sont **dérivés**
+  (messages plus récents que `seenChats[scope]`), fidèle au principe « pas de
+  collection inbox » : hook partagé `useFriendDms` (`lib/hooks.ts`) utilisé à
+  la fois par la page Amis et la cloche, donc un badge ne peut pas mentir sur
+  le fil qu'il pointe. Ouvrir la conversation appelle `backend.setSeenChat`.
+- **Invitations à jouer** : un MP ORDINAIRE portant le marqueur
+  `[invite:<gameId>]` (`inviteMessage` / `parseInvite`, `lib/types.ts`) —
+  aucune collection ni règle dédiée, et l'invitation hérite gratuitement de la
+  livraison DM, des non-lus et des notifications. `ChatChannel` rend le marqueur
+  en carte cliquable (cover + « Rejoindre ») ; la liste d'amis et la cloche le
+  reformulent en texte lisible. Un client qui ne le rendrait pas affiche quand
+  même quelque chose d'intelligible.
 - **Markdown** : descriptions de jeu et de demande rendues via `components/Markdown.tsx`
   (marked + DOMPurify, GFM, liens en target _blank). Chat et commentaires restent
   en texte brut.
@@ -190,6 +214,25 @@ En mode local : premier utilisateur créé = admin (pratique pour tester).
   masqué tant qu'aucun jeu de ce kind n'existe, ex. « Sur le portail » avant
   le premier jeu embedded) ; tags dans un menu déroulant ; ligne d'aide
   « Propose-le depuis ta page profil » pointant vers le profil du membre.
+- **Amis** (/friends) : hub social, pas un annuaire. Colonne gauche =
+  demandes reçues + liste d'amis SÉLECTIONNABLE (tri : non-lus, puis en ligne,
+  puis message le plus récent) + ajout de membres. Colonne droite, deux modes :
+  - *aucun ami sélectionné* → « Tes amis y jouent, pas toi » (suggestions) puis
+    le **fil d'activité** des amis ;
+  - *ami sélectionné* → la conversation privée (`ChatChannel` sur le scope DM),
+    avec « ▶ Rejoindre » vers son jeu en cours et « 🎮 Inviter ».
+
+  Sur mobile, la colonne gauche est un tiroir (même motif que le forum).
+- **Activité & suggestions** (`lib/activity.ts`, fonctions PURES) : `buildFriendActivity`
+  fusionne parties (`plays`), jeux publiés et demandes des amis en un fil trié ;
+  `buildSuggestions` liste les jeux qu'au moins un ami a lancés et pas toi.
+  Comme les méta-succès, **tout est dérivé** de données déjà surveillées — pas
+  de collection d'activité, rien à dénormaliser. Les lancements répétés du même
+  jeu sont repliés (un seul item par ami+jeu).
+- **Comparaison de succès** : sur le profil d'un AUTRE membre, chaque méta-succès
+  porte un marqueur « ✓ toi / — toi ». `useAllScopeData` (données globales) est
+  appelé une fois puis `useUserStats` deux fois (lui + toi) : la comparaison ne
+  coûte aucun abonnement chat/requests supplémentaire.
 - **Statut « je joue »** : posé uniquement par le bouton ▶ Jouer d'un jeu (web
   ou embedded) — plus de sélecteur manuel de jeu dans le menu avatar (topbar),
   qui ne garde qu'« Arrêter » comme garde-fou quand un statut est actif.
@@ -232,7 +275,11 @@ src/
   lib/
     firebase.ts        init Firebase (null si pas de config → mode local)
     types.ts           types du domaine + labels FR
-    hooks.ts           useRequests, useComments (subs par jeu/demande)
+    hooks.ts           useRequests, useComments (subs par jeu/demande),
+                       useAllScopeData + useUserStats (stats méta, partageables
+                       entre 2 membres), useFriendDms (MP + non-lus), usePlaysMap
+    activity.ts        buildFriendActivity / buildSuggestions (pur, dérivé)
+    format.ts          relativeTime (FR compact)
     backend/           interface + impl firebase + impl local + sélection
   stores/              zustand : auth, users (annuaire), games, friends, presence
   components/

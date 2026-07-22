@@ -118,6 +118,7 @@ export class FirebaseBackend implements Backend {
       profileTitle: 'none',
       profileAccent: 'default',
       favoriteGameId: '',
+      seenChats: {},
     }
     await setDoc(userRef, profile)
   }
@@ -142,6 +143,7 @@ export class FirebaseBackend implements Backend {
       profileTitle: 'none',
       profileAccent: 'default',
       favoriteGameId: '',
+      seenChats: {},
     }
     await setDoc(userRef, profile)
   }
@@ -167,6 +169,12 @@ export class FirebaseBackend implements Backend {
   async setSeenUpdate(uid: string, gameId: string, publishedAt: number): Promise<void> {
     await updateDoc(doc(this.db, 'users', uid), {
       [`seenUpdates.${gameId}`]: publishedAt,
+    })
+  }
+
+  async setSeenChat(uid: string, scopeId: string, lastAt: number): Promise<void> {
+    await updateDoc(doc(this.db, 'users', uid), {
+      [`seenChats.${scopeId}`]: lastAt,
     })
   }
 

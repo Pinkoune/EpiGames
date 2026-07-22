@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { hasUnseenNewGame, hasUnseenUpdate } from '../../lib/types'
+import { useFriendDms } from '../../lib/hooks'
+import { hasUnseenNewGame, hasUnseenUpdate, parseInvite } from '../../lib/types'
 import { useAuthStore } from '../../stores/authStore'
 import { useFriendsStore, friendUidsOf, pendingIncoming } from '../../stores/friendsStore'
 import { useGamesStore } from '../../stores/gamesStore'
@@ -23,6 +24,13 @@ export function NotificationsBell() {
   const presence = usePresenceStore((s) => s.presence)
   const [open, setOpen] = useState(false)
 
+  // Hooks must run before the early return below.
+  const friendUids = useMemo(
+    () => (user ? friendUidsOf(friendships, user.uid) : []),
+    [friendships, user],
+  )
+  const dms = useFriendDms(user, friendUids)
+
   if (!user) return null
 
   const incoming = pendingIncoming(friendships, user.uid)
@@ -32,11 +40,14 @@ export function NotificationsBell() {
   const newGames = games.filter(
     (g) => g.approved && !g.archived && hasUnseenNewGame(user, g),
   )
-  const friendsInGame = friendUidsOf(friendships, user.uid)
+  const friendsInGame = friendUids
     .map((uid) => ({ uid, info: presence[uid] }))
     .filter((f) => f.info?.online && f.info.playing)
 
-  const count = incoming.length + updatedGames.length + newGames.length
+  const unreadDms = dms.filter((d) => d.unread > 0)
+  const dmCount = unreadDms.reduce((sum, d) => sum + d.unread, 0)
+
+  const count = incoming.length + updatedGames.length + newGames.length + dmCount
   const isEmpty = count === 0 && friendsInGame.length === 0
 
   return (
@@ -74,6 +85,35 @@ export function NotificationsBell() {
               {isEmpty && (
                 <p className="px-4 py-6 text-center text-sm text-ink-dim">Rien de neuf.</p>
               )}
+
+              {/* Private messages first — the only entry someone is waiting on. */}
+              {unreadDms.map((dm) => (
+                <Link
+                  key={dm.scopeId}
+                  to="/friends"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm transition hover:bg-panel-2"
+                >
+                  <Avatar user={users[dm.friendUid]} size="sm" />
+                  <span className="min-w-0 flex-1">
+                    <span className="font-semibold">
+                      {users[dm.friendUid]?.displayName ?? '???'}
+                    </span>
+                    <span className="block truncate text-xs text-ink-dim">
+                      {(() => {
+                        const text = dm.lastMessage?.text ?? ''
+                        const invited = parseInvite(text)
+                        if (!invited) return text
+                        const title = games.find((g) => g.id === invited)?.title
+                        return `🎮 T'invite à jouer${title ? ` à ${title}` : ''}`
+                      })()}
+                    </span>
+                  </span>
+                  <span className="shrink-0 rounded-full bg-accent px-1.5 text-xs font-bold text-abyss">
+                    {dm.unread}
+                  </span>
+                </Link>
+              ))}
 
               {incoming.length > 0 && (
                 <Link

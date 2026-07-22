@@ -269,12 +269,28 @@ service cloud.firestore {
     // ---------- forum chats ("Général" channels) ----------
     // scopeId = '_portal' (portal-wide) or a gameId. Flat message list.
     match /chats/{scopeId}/messages/{messageId} {
-      allow read: if signedIn();
+      // Private conversations reuse this collection under the scope
+      // "dm_<uidA>_<uidB>" (sorted pair, see dmScopeId in lib/types.ts).
+      // The participants are encoded IN the scope id, so membership is
+      // checked by parsing it back out — no extra doc read, and a DM is
+      // invisible to everyone else. Portal/game channels stay open to all
+      // members. Firebase uids and local "local-<slug>" ids never contain
+      // '_', so splitting on it is unambiguous.
+      function isDm() {
+        return scopeId.matches('dm_.*');
+      }
+      function inThisDm() {
+        return signedIn() && request.auth.uid in scopeId.split('_');
+      }
+
+      allow read: if signedIn() && (!isDm() || inThisDm());
       allow create: if signedIn()
-        && request.resource.data.authorUid == request.auth.uid;
+        && request.resource.data.authorUid == request.auth.uid
+        && (!isDm() || inThisDm());
       allow update: if false;
-      allow delete: if isAdmin()
-        || (signedIn() && resource.data.authorUid == request.auth.uid);
+      // Admins moderate public channels, but a DM is nobody else's business.
+      allow delete: if (signedIn() && resource.data.authorUid == request.auth.uid)
+        || (isAdmin() && !isDm());
     }
 
     // ---------- friendships ----------

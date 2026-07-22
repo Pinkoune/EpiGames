@@ -45,6 +45,12 @@ export interface UserProfile {
   profileAccent: string
   /** Steam-style showcase: one game pinned to the top of the profile ('' = none). */
   favoriteGameId: string
+  /**
+   * chatScopeId -> createdAt of the last message this user has read.
+   * Same pattern as `seenUpdates`: unread counts stay derived, no inbox
+   * collection and no per-message read receipts.
+   */
+  seenChats: Record<string, number>
 }
 
 /**
@@ -220,6 +226,38 @@ export function friendshipId(a: string, b: string): string {
   return [a, b].sort().join('_')
 }
 
+/**
+ * Chat scope of a private conversation between two members. A DM is not a new
+ * data model — it's the generic `chats/{scopeId}` collection with a scope only
+ * its two participants may read (enforced in firestore.rules, which parses the
+ * uids back out of this id). Sorted so both sides derive the same scope.
+ */
+export function dmScopeId(a: string, b: string): string {
+  return `dm_${[a, b].sort().join('_')}`
+}
+
+/** True for a private-conversation scope (vs the portal or a game channel). */
+export function isDmScope(scopeId: string): boolean {
+  return scopeId.startsWith('dm_')
+}
+
+/**
+ * Game invites travel as ordinary chat messages carrying a marker, so they
+ * inherit DM delivery, unread counts and notifications for free — no invite
+ * collection, no new rules. The renderer turns the marker into a card; an
+ * unrendered client still shows something intelligible.
+ */
+const INVITE_RE = /^\[invite:([^\]\s]+)\]$/
+
+export function inviteMessage(gameId: string): string {
+  return `[invite:${gameId}]`
+}
+
+/** gameId if the message is an invite, else null. */
+export function parseInvite(text: string): string | null {
+  return INVITE_RE.exec(text.trim())?.[1] ?? null
+}
+
 /** True while the game has an update announcement the user hasn't dismissed. */
 export function hasUnseenUpdate(user: UserProfile | null, game: Game): boolean {
   if (!game.update || !user) return false
@@ -289,6 +327,7 @@ export function normalizeUser(raw: Partial<UserProfile> & { uid: string }): User
     profileTitle: 'none',
     profileAccent: 'default',
     favoriteGameId: '',
+    seenChats: {},
     ...raw,
   }
 }
