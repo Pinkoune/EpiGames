@@ -4,22 +4,43 @@
  * sombre épurée" direction: no rainbow-everywhere, opt-in flair only.
  */
 
+/**
+ * How a frame animates. Each value maps to a CSS class in index.css
+ * (`.af-*`), except 'pulse' which reuses Tailwind's `animate-pulse`.
+ *
+ * - backdrop-driven (need `spinBg`): 'spin', 'spin-rev', 'hue', 'orbit'
+ * - inner-box-driven (need `ringClass`): 'pulse', 'breathe', 'flicker'
+ */
+export type FrameAnimation =
+  | 'spin'
+  | 'spin-rev'
+  | 'hue'
+  | 'orbit'
+  | 'pulse'
+  | 'breathe'
+  | 'flicker'
+
 export interface AvatarFrame {
   label: string
   /** Extra classes applied to the avatar's inner (bordered) box. */
   ringClass: string
+  animation?: FrameAnimation
   /**
-   * Animated backdrop behind the avatar:
-   * - 'spin' rotates a conic gradient (`spinBg`) around the avatar.
-   * - 'pulse' softly pulses a colored glow ring (`ringClass` carries the glow).
+   * Gradient painted on the rotating backdrop layer behind the avatar
+   * ('spin' | 'spin-rev' | 'hue'). The inner box is opaque, so only the
+   * few pixels sticking out around it read as a ring.
    */
-  animation?: 'spin' | 'pulse'
-  /** conic-gradient CSS used when animation === 'spin'. */
   spinBg?: string
+  /** Animation duration in seconds. Defaults to 3s. */
+  speed?: number
+  /** Color of the small orbiting dot (animation === 'orbit'). */
+  orbitColor?: string
 }
 
 export const AVATAR_FRAMES: Record<string, AvatarFrame> = {
   none: { label: 'Aucun', ringClass: '' },
+
+  // ---- static rings ----
   accent: { label: 'Accent', ringClass: 'ring-2 ring-accent ring-offset-2 ring-offset-abyss' },
   amber: {
     label: 'Or',
@@ -41,8 +62,17 @@ export const AVATAR_FRAMES: Record<string, AvatarFrame> = {
     ringClass:
       'ring-2 ring-rose-400 ring-offset-2 ring-offset-abyss shadow-[0_0_10px_rgba(251,113,133,0.55)]',
   },
+  cyan: {
+    label: 'Cyan',
+    ringClass:
+      'ring-2 ring-cyan-400 ring-offset-2 ring-offset-abyss shadow-[0_0_10px_rgba(34,211,238,0.55)]',
+  },
+  steel: {
+    label: 'Acier',
+    ringClass: 'ring-2 ring-zinc-400/80 ring-offset-2 ring-offset-abyss',
+  },
 
-  // ---- animated ----
+  // ---- animated: rotating gradient ring ----
   prisma: {
     label: 'Prisma',
     ringClass: '',
@@ -73,17 +103,144 @@ export const AVATAR_FRAMES: Record<string, AvatarFrame> = {
     animation: 'spin',
     spinBg: 'conic-gradient(from 0deg, #a855f7, #ec4899, #22d3ee, #a855f7)',
   },
+  ice: {
+    label: 'Glace',
+    ringClass: '',
+    animation: 'spin',
+    speed: 5,
+    spinBg: 'conic-gradient(from 0deg, #e0f2fe, #38bdf8, #0ea5e9, #e0f2fe)',
+  },
+  toxic: {
+    label: 'Toxique',
+    ringClass: '',
+    animation: 'spin',
+    speed: 2.4,
+    spinBg: 'conic-gradient(from 0deg, #a3e635, #22c55e, #065f46, #a3e635)',
+  },
+  sakura: {
+    label: 'Sakura',
+    ringClass: '',
+    animation: 'spin',
+    speed: 4.5,
+    spinBg: 'conic-gradient(from 0deg, #fce7f3, #f9a8d4, #ec4899, #fce7f3)',
+  },
+  monochrome: {
+    label: 'Argent',
+    ringClass: '',
+    animation: 'spin',
+    speed: 4,
+    spinBg: 'conic-gradient(from 0deg, #ffffff, #94a3b8, #1e293b, #94a3b8, #ffffff)',
+  },
+
+  // ---- animated: reverse rotation (synthwave feel) ----
+  retrowave: {
+    label: 'Retrowave',
+    ringClass: '',
+    animation: 'spin-rev',
+    speed: 3.5,
+    spinBg: 'conic-gradient(from 0deg, #f0abfc, #d946ef, #22d3ee, #f0abfc)',
+  },
+
+  // ---- animated: segmented "reticle" ring (console/loading look) ----
+  reticle: {
+    label: 'Réticule',
+    ringClass: '',
+    animation: 'spin',
+    speed: 6,
+    spinBg: 'repeating-conic-gradient(#3d9cff 0deg 14deg, transparent 14deg 45deg)',
+  },
+  reticleGold: {
+    label: 'Réticule or',
+    ringClass: '',
+    animation: 'spin-rev',
+    speed: 7,
+    spinBg: 'repeating-conic-gradient(#fbbf24 0deg 10deg, transparent 10deg 36deg)',
+  },
+
+  // ---- animated: single sweeping comet head ----
+  comet: {
+    label: 'Comète',
+    ringClass: '',
+    animation: 'spin',
+    speed: 2.2,
+    spinBg:
+      'conic-gradient(from 0deg, transparent 0deg 260deg, rgba(61,156,255,0.25) 310deg, #3d9cff 348deg, #ffffff 360deg)',
+  },
+  cometRose: {
+    label: 'Comète rose',
+    ringClass: '',
+    animation: 'spin-rev',
+    speed: 2.6,
+    spinBg:
+      'conic-gradient(from 0deg, transparent 0deg 260deg, rgba(244,114,182,0.25) 310deg, #f472b6 348deg, #ffffff 360deg)',
+  },
+
+  // ---- animated: full-spectrum hue cycling ----
+  spectrum: {
+    label: 'Spectre',
+    ringClass: '',
+    animation: 'hue',
+    speed: 3,
+    spinBg: 'conic-gradient(from 0deg, #ff0060, #ff8a00, #ffe600, #00d4ff, #7b2ff7, #ff0060)',
+  },
+
+  // ---- animated: orbiting satellite dot ----
+  orbitAccent: {
+    label: 'Satellite',
+    ringClass: 'ring-1 ring-accent/40',
+    animation: 'orbit',
+    speed: 3.5,
+    orbitColor: '#3d9cff',
+  },
+  orbitGold: {
+    label: 'Satellite or',
+    ringClass: 'ring-1 ring-amber-400/40',
+    animation: 'orbit',
+    speed: 5,
+    orbitColor: '#fbbf24',
+  },
+  orbitEmerald: {
+    label: 'Satellite vert',
+    ringClass: 'ring-1 ring-emerald-400/40',
+    animation: 'orbit',
+    speed: 2.6,
+    orbitColor: '#34d399',
+  },
+
+  // ---- animated: glow effects on the box itself ----
   pulseAccent: {
     label: 'Pulsation',
-    ringClass:
-      'ring-2 ring-accent shadow-[0_0_14px_rgba(61,156,255,0.8)]',
+    ringClass: 'ring-2 ring-accent shadow-[0_0_14px_rgba(61,156,255,0.8)]',
     animation: 'pulse',
   },
   pulseEmerald: {
     label: 'Battement',
-    ringClass:
-      'ring-2 ring-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.8)]',
+    ringClass: 'ring-2 ring-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.8)]',
     animation: 'pulse',
+  },
+  breatheViolet: {
+    label: 'Respiration',
+    ringClass: 'ring-2 ring-violet-400 shadow-[0_0_16px_rgba(167,139,250,0.85)]',
+    animation: 'breathe',
+    speed: 3.2,
+  },
+  breatheAmber: {
+    label: 'Braise',
+    ringClass: 'ring-2 ring-amber-500 shadow-[0_0_16px_rgba(245,158,11,0.85)]',
+    animation: 'breathe',
+    speed: 2.2,
+  },
+  flickerNeon: {
+    label: 'Néon fatigué',
+    ringClass: 'ring-2 ring-fuchsia-400 shadow-[0_0_16px_rgba(232,121,249,0.9)]',
+    animation: 'flicker',
+    speed: 4,
+  },
+  flickerGhost: {
+    label: 'Fantôme',
+    ringClass: 'ring-2 ring-cyan-300/80 shadow-[0_0_16px_rgba(103,232,249,0.8)]',
+    animation: 'flicker',
+    speed: 6,
   },
 }
 
@@ -119,6 +276,84 @@ export const PROFILE_BACKGROUNDS: Record<string, ProfileBackground> = {
     label: 'Royal',
     css: 'linear-gradient(135deg, #170b3a 0%, #3a1d6e 50%, #6b2fa0 100%)',
   },
+  midnight: {
+    label: 'Minuit',
+    css: 'linear-gradient(135deg, #05060a 0%, #131826 55%, #253150 100%)',
+  },
+  synthwave: {
+    label: 'Synthwave',
+    css: 'linear-gradient(160deg, #1b0733 0%, #5b1668 45%, #b93a7a 78%, #f07a4d 100%)',
+  },
+  toxic: {
+    label: 'Toxique',
+    css: 'linear-gradient(135deg, #0b1a05 0%, #1f3d0c 50%, #4d7c0f 100%)',
+  },
+  // Subtle, non-flat presets: a soft glow instead of a plain gradient sweep.
+  nebula: {
+    label: 'Nébuleuse',
+    css: 'radial-gradient(120% 90% at 20% 0%, #3b1d6e 0%, transparent 60%), radial-gradient(100% 80% at 90% 20%, #1d4e6b 0%, transparent 55%), #0c0d11',
+  },
+  crimson: {
+    label: 'Cramoisi',
+    css: 'radial-gradient(120% 90% at 80% 0%, #6b1220 0%, transparent 60%), #0c0d11',
+  },
+}
+
+/**
+ * Profile accent color. Applied by overriding the `--color-accent` custom
+ * property on the profile page container, so every `text-accent` /
+ * `bg-accent` inside it re-themes with zero per-element changes.
+ */
+export const PROFILE_ACCENTS: Record<string, { label: string; color: string }> = {
+  default: { label: 'Bleu (défaut)', color: '' },
+  emerald: { label: 'Émeraude', color: '#34d399' },
+  amber: { label: 'Or', color: '#fbbf24' },
+  violet: { label: 'Violet', color: '#a78bfa' },
+  rose: { label: 'Rose', color: '#fb7185' },
+  cyan: { label: 'Cyan', color: '#22d3ee' },
+  lime: { label: 'Citron', color: '#a3e635' },
+  orange: { label: 'Orange', color: '#fb923c' },
+}
+
+/** Resolve a stored `profileAccent` to a CSS color, or '' to keep the default. */
+export function resolveProfileAccent(value: string): string {
+  return PROFILE_ACCENTS[value]?.color ?? ''
+}
+
+/**
+ * Selectable profile titles, shown under the member's name. Most are EARNED:
+ * `requires` names a meta-achievement id (lib/achievements.ts), so titles
+ * inherit that system's "computed from real data, uncheatable" property
+ * instead of adding storage of their own.
+ */
+export interface ProfileTitle {
+  label: string
+  /** Meta-achievement id needed to wear it, or null when free for everyone. */
+  requires: string | null
+}
+
+export const PROFILE_TITLES: Record<string, ProfileTitle> = {
+  none: { label: 'Aucun', requires: null },
+  // Free — available from day one so a new member isn't left with nothing.
+  rookie: { label: 'Nouvelle recrue', requires: null },
+  sunday: { label: 'Joueur du dimanche', requires: null },
+  lurker: { label: 'Observateur discret', requires: null },
+  // Earned via meta-achievements.
+  dev: { label: 'Développeur', requires: 'first-game' },
+  studio: { label: 'Studio indé', requires: 'studio' },
+  bugHunter: { label: 'Chasseur de bugs', requires: 'bug-hunter' },
+  visionary: { label: 'Visionnaire', requires: 'visionary' },
+  star: { label: 'Star du portail', requires: 'popular' },
+  pillar: { label: 'Pilier du groupe', requires: 'social' },
+  loudmouth: { label: 'Grande gueule', requires: 'chatty' },
+  explorer: { label: 'Explorateur', requires: 'explorer' },
+  veteran: { label: 'Vétéran', requires: 'regular' },
+}
+
+/** Label of a stored title id, or '' when unset/unknown. */
+export function resolveProfileTitle(value: string): string {
+  if (!value || value === 'none') return ''
+  return PROFILE_TITLES[value]?.label ?? ''
 }
 
 /** A profile background is a custom URL, not a preset id. */

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { backend } from '../lib/backend'
-import type { UserProfile } from '../lib/types'
+import type { EditableProfile, UserProfile } from '../lib/types'
 
 interface AuthState {
   user: UserProfile | null
@@ -13,11 +13,7 @@ interface AuthState {
   signInGoogle: () => Promise<void>
   signInLocal: (displayName: string) => Promise<void>
   signOut: () => Promise<void>
-  updateProfile: (
-    patch: Partial<
-      Pick<UserProfile, 'displayName' | 'avatar' | 'bio' | 'profileFrame' | 'profileBackground'>
-    >,
-  ) => Promise<void>
+  updateProfile: (patch: Partial<EditableProfile>) => Promise<void>
   clearError: () => void
 }
 

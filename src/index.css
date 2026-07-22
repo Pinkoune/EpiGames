@@ -49,6 +49,45 @@ button:disabled {
   cursor: default;
 }
 
+/* ---- Avatar frame animations (see lib/profileCustomization.ts) ----
+   Each `.af-*` class pairs with a FrameAnimation value. Duration comes from
+   the `--af-speed` custom property the Avatar sets per frame. */
+@keyframes af-rotate {
+  to { transform: rotate(360deg); }
+}
+@keyframes af-hue {
+  to { filter: hue-rotate(360deg); }
+}
+@keyframes af-breathe {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.05); }
+}
+@keyframes af-flicker {
+  0%, 100% { opacity: 1; }
+  8%   { opacity: 0.3; }
+  11%  { opacity: 1; }
+  19%  { opacity: 0.45; }
+  22%  { opacity: 1; }
+  63%  { opacity: 0.8; }
+  67%  { opacity: 1; }
+}
+
+.af-spin     { animation: af-rotate var(--af-speed, 3s) linear infinite; }
+.af-spin-rev { animation: af-rotate var(--af-speed, 3s) linear infinite reverse; }
+/* Rotates AND cycles hue — two properties, so both animations coexist. */
+.af-hue      { animation: af-rotate var(--af-speed, 3s) linear infinite,
+                          af-hue 6s linear infinite; }
+.af-orbit    { animation: af-rotate var(--af-speed, 3.5s) linear infinite; }
+.af-breathe  { animation: af-breathe var(--af-speed, 3s) ease-in-out infinite; }
+.af-flicker  { animation: af-flicker var(--af-speed, 4s) linear infinite; }
+
+/* Accessibility: flair should never fight the user's motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  .af-spin, .af-spin-rev, .af-hue, .af-orbit, .af-breathe, .af-flicker {
+    animation: none;
+  }
+}
+
 /* Markdown content (game/request descriptions) */
 .md { line-height: 1.65; }
 .md > * + * { margin-top: 0.75em; }

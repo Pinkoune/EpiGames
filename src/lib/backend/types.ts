@@ -2,6 +2,7 @@ import type {
   AchievementStatus,
   ChatMessage,
   Friendship,
+  EditableProfile,
   Game,
   GameAchievement,
   GameRequest,
@@ -59,12 +60,7 @@ export interface Backend {
   /** Local mode only: instant pseudo-based session. */
   signInLocal(displayName: string): Promise<void>
   signOut(): Promise<void>
-  updateProfile(
-    uid: string,
-    patch: Partial<
-      Pick<UserProfile, 'displayName' | 'avatar' | 'bio' | 'profileFrame' | 'profileBackground'>
-    >,
-  ): Promise<void>
+  updateProfile(uid: string, patch: Partial<EditableProfile>): Promise<void>
   /** Dismiss a game's update announcement ("j'ai vu") for this user. */
   setSeenUpdate(uid: string, gameId: string, publishedAt: number): Promise<void>
 

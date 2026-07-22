@@ -35,7 +35,34 @@ export interface UserProfile {
    * like avatar/coverUrl, a direct image URL pasted by the user.
    */
   profileBackground: string
+  /**
+   * Selectable title shown under the name (preset id, 'none' = hidden).
+   * Most titles are gated on a meta-achievement — the gate is enforced in
+   * the editor UI only, like the rest of this client-authoritative design.
+   */
+  profileTitle: string
+  /** Accent color preset id used to theme the profile page ('default' = blue). */
+  profileAccent: string
+  /** Steam-style showcase: one game pinned to the top of the profile ('' = none). */
+  favoriteGameId: string
 }
+
+/**
+ * Fields a member may edit on their own profile. Single source of truth for
+ * the `updateProfile` signature across the store and both backends — adding a
+ * personalization field means touching this list (and the rules) only.
+ */
+export type EditableProfile = Pick<
+  UserProfile,
+  | 'displayName'
+  | 'avatar'
+  | 'bio'
+  | 'profileFrame'
+  | 'profileBackground'
+  | 'profileTitle'
+  | 'profileAccent'
+  | 'favoriteGameId'
+>
 
 /** Announcement a game owner publishes when they ship an update. */
 export interface GameUpdate {
@@ -259,6 +286,9 @@ export function normalizeUser(raw: Partial<UserProfile> & { uid: string }): User
     linkedUids: [],
     profileFrame: 'none',
     profileBackground: 'none',
+    profileTitle: 'none',
+    profileAccent: 'default',
+    favoriteGameId: '',
     ...raw,
   }
 }

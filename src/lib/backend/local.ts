@@ -2,6 +2,7 @@ import type {
   AchievementStatus,
   ChatMessage,
   Friendship,
+  EditableProfile,
   Game,
   GameAchievement,
   GameRequest,
@@ -200,6 +201,9 @@ export class LocalBackend implements Backend {
           linkedUids: [],
           profileFrame: 'none',
           profileBackground: 'none',
+          profileTitle: 'none',
+          profileAccent: 'default',
+          favoriteGameId: '',
         })
       }
     })
@@ -216,9 +220,7 @@ export class LocalBackend implements Backend {
 
   async updateProfile(
     targetUid: string,
-    patch: Partial<
-      Pick<UserProfile, 'displayName' | 'avatar' | 'bio' | 'profileFrame' | 'profileBackground'>
-    >,
+    patch: Partial<EditableProfile>,
   ): Promise<void> {
     this.mutate((db) => {
       const u = db.users.find((x) => x.uid === targetUid)

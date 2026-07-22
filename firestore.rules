@@ -55,13 +55,38 @@ service cloud.firestore {
               && request.resource.data.profileBackground.size() < 2000);
       }
 
+      // Title / accent are preset ids, favoriteGameId is a game doc id — all
+      // short strings. Which title a member is ENTITLED to wear is gated in
+      // the UI only (consistent with the client-authoritative trust model).
+      function profileTitleOk() {
+        return !('profileTitle' in request.resource.data)
+          || (request.resource.data.profileTitle is string
+              && request.resource.data.profileTitle.size() < 40);
+      }
+
+      function profileAccentOk() {
+        return !('profileAccent' in request.resource.data)
+          || (request.resource.data.profileAccent is string
+              && request.resource.data.profileAccent.size() < 40);
+      }
+
+      function favoriteGameOk() {
+        return !('favoriteGameId' in request.resource.data)
+          || (request.resource.data.favoriteGameId is string
+              && request.resource.data.favoriteGameId.size() < 200);
+      }
+
+      function profileExtrasOk() {
+        return profileTitleOk() && profileAccentOk() && favoriteGameOk();
+      }
+
       // A user creates only their own doc, never as admin and never with
       // pre-linked external uids.
       allow create: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.isAdmin == false
         && request.resource.data.linkedUids == []
-        && avatarOk() && profileFrameOk() && profileBackgroundOk();
+        && avatarOk() && profileFrameOk() && profileBackgroundOk() && profileExtrasOk();
 
       // Self-edit: profile fields only. isAdmin is only ever granted by an
       // existing admin (or the Firebase console). linkedUids is reserved for
@@ -69,7 +94,7 @@ service cloud.firestore {
       allow update: if isAdmin()
         || (signedIn()
             && request.auth.uid == uid
-            && avatarOk() && profileFrameOk() && profileBackgroundOk()
+            && avatarOk() && profileFrameOk() && profileBackgroundOk() && profileExtrasOk()
             && !request.resource.data.diff(resource.data).affectedKeys()
                 .hasAny(['isAdmin', 'linkedUids', 'createdAt']));
 

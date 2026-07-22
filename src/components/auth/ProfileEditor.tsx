@@ -1,8 +1,13 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { useAuthStore } from '../../stores/authStore'
+import { canSeeGame, useGamesStore } from '../../stores/gamesStore'
+import { computeMetaAchievements } from '../../lib/achievements'
+import { useMetaProfile } from '../../lib/hooks'
 import {
   AVATAR_FRAMES,
+  PROFILE_ACCENTS,
   PROFILE_BACKGROUNDS,
+  PROFILE_TITLES,
   isCustomBackground,
   resolveProfileBackground,
 } from '../../lib/profileCustomization'
@@ -65,9 +70,28 @@ export function ProfileEditor({ onClose }: { onClose: () => void }) {
       ? user.profileBackground
       : '',
   )
+  const [title, setTitle] = useState(user?.profileTitle ?? 'none')
+  const [accent, setAccent] = useState(user?.profileAccent ?? 'default')
+  const [favoriteGameId, setFavoriteGameId] = useState(user?.favoriteGameId ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+
+  const games = useGamesStore((s) => s.games)
+  // Titles are gated on meta-achievements — same computation the profile page
+  // uses, so what's unlocked here always matches the badges shown there.
+  const { stats } = useMetaProfile(user?.uid, games)
+  const earnedIds = new Set(
+    computeMetaAchievements(stats)
+      .filter((a) => a.earned)
+      .map((a) => a.def.id),
+  )
+  const showcaseGames = games.filter((g) => !g.archived && canSeeGame(user, g))
+
+  // Split the (now long) frame list so animated options are easy to find.
+  const frameEntries = Object.entries(AVATAR_FRAMES)
+  const staticFrames = frameEntries.filter(([, f]) => !f.animation)
+  const animatedFrames = frameEntries.filter(([, f]) => f.animation)
 
   async function pickFile(file: File | undefined) {
     if (!file) return
@@ -90,6 +114,9 @@ export function ProfileEditor({ onClose }: { onClose: () => void }) {
         profileFrame: frame,
         // A custom URL always wins over the preset picker below it.
         profileBackground: backgroundUrl.trim() || background,
+        profileTitle: title,
+        profileAccent: accent,
+        favoriteGameId,
       })
       onClose()
     } finally {
@@ -98,7 +125,7 @@ export function ProfileEditor({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title="Mon profil" onClose={onClose}>
+    <Modal title="Mon profil" onClose={onClose} wide>
       <form onSubmit={submit} className="space-y-4">
         <div>
           <label className="mb-1 block text-sm text-ink-dim">Pseudo</label>
@@ -171,22 +198,106 @@ export function ProfileEditor({ onClose }: { onClose: () => void }) {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm text-ink-dim">Contour de l'avatar</label>
+          <label className="mb-1 block text-sm text-ink-dim">
+            Contour de l'avatar
+            <span className="ml-2 text-xs text-ink-dim/70">
+              {AVATAR_FRAMES[frame]?.label ?? 'Aucun'}
+            </span>
+          </label>
+          {(
+            [
+              ['Simples', staticFrames],
+              ['Animés', animatedFrames],
+            ] as const
+          ).map(([groupLabel, list]) => (
+            <div key={groupLabel} className="mt-2">
+              <p className="mb-1.5 text-[11px] tracking-[0.15em] text-ink-dim/70 uppercase">
+                {groupLabel}
+              </p>
+              <div className="flex flex-wrap gap-2.5">
+                {list.map(([id, f]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setFrame(id)}
+                    title={f.label}
+                    className={`rounded-md p-1.5 transition ${
+                      frame === id
+                        ? 'bg-accent/15 outline outline-1 outline-accent'
+                        : 'hover:bg-panel-2'
+                    }`}
+                  >
+                    <Avatar user={{ avatar, displayName, profileFrame: id }} size="sm" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm text-ink-dim">Titre affiché</label>
+          <select
+            className={inputCls}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          >
+            {Object.entries(PROFILE_TITLES).map(([id, t]) => {
+              const locked = t.requires !== null && !earnedIds.has(t.requires)
+              return (
+                <option key={id} value={id} disabled={locked}>
+                  {t.label}
+                  {locked ? ' 🔒 (succès à débloquer)' : ''}
+                </option>
+              )
+            })}
+          </select>
+          <p className="mt-1 text-xs text-ink-dim/70">
+            Les titres verrouillés s'obtiennent en décrochant le succès correspondant
+            sur ton profil.
+          </p>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm text-ink-dim">
+            Couleur du profil
+            <span className="ml-2 text-xs text-ink-dim/70">
+              {PROFILE_ACCENTS[accent]?.label ?? ''}
+            </span>
+          </label>
           <div className="flex flex-wrap gap-2">
-            {Object.entries(AVATAR_FRAMES).map(([id, f]) => (
+            {Object.entries(PROFILE_ACCENTS).map(([id, a]) => (
               <button
                 key={id}
                 type="button"
-                onClick={() => setFrame(id)}
-                title={f.label}
-                className={`rounded-md p-1 transition ${
-                  frame === id ? 'bg-accent/15 outline outline-1 outline-accent' : 'hover:bg-panel-2'
+                title={a.label}
+                onClick={() => setAccent(id)}
+                className={`h-8 w-8 rounded-full border-2 transition ${
+                  accent === id ? 'border-ink' : 'border-edge hover:border-edge-2'
                 }`}
-              >
-                <Avatar user={{ avatar, displayName, profileFrame: id }} size="sm" />
-              </button>
+                style={{ background: a.color || 'var(--color-accent)' }}
+              />
             ))}
           </div>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm text-ink-dim">Jeu vitrine</label>
+          <select
+            className={inputCls}
+            value={favoriteGameId}
+            onChange={(e) => setFavoriteGameId(e.target.value)}
+          >
+            <option value="">Aucun</option>
+            {showcaseGames.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.title}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-ink-dim/70">
+            Épinglé en haut de ton profil — ton coup de cœur du moment.
+          </p>
         </div>
 
         <div>

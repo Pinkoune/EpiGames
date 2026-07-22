@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import type { GameStatus, RequestStatus, UserProfile } from '../lib/types'
 import { GAME_STATUS_LABELS, REQUEST_STATUS_LABELS } from '../lib/types'
 import { AVATAR_FRAMES } from '../lib/profileCustomization'
@@ -114,23 +114,54 @@ export function Avatar({
   online?: boolean
 }) {
   const sizes = { sm: 'h-7 w-7 text-sm', md: 'h-9 w-9 text-lg', lg: 'h-16 w-16 text-3xl' }
+  const dotSizes = { sm: 'h-1.5 w-1.5', md: 'h-2 w-2', lg: 'h-3 w-3' }
   const avatar = user?.avatar || '👤'
   // Real picture (Google photoURL, external URL/GIF, or resized custom upload) vs emoji.
   const isImage = avatar.startsWith('http') || avatar.startsWith('data:image/')
   const frame = AVATAR_FRAMES[user?.profileFrame ?? 'none'] ?? AVATAR_FRAMES.none
+  const anim = frame.animation
+  // Duration is per-frame; the `.af-*` classes read it from --af-speed.
+  const speedVar = { '--af-speed': `${frame.speed ?? 3}s` } as CSSProperties
+  // Animations that paint a rotating gradient layer BEHIND the (opaque) box.
+  const isBackdrop = anim === 'spin' || anim === 'spin-rev' || anim === 'hue'
+  // Animations that act on the box itself.
+  const boxAnim =
+    anim === 'pulse'
+      ? 'animate-pulse'
+      : anim === 'breathe'
+        ? 'af-breathe'
+        : anim === 'flicker'
+          ? 'af-flicker'
+          : ''
+
   return (
     <span className="relative inline-block shrink-0">
-      {frame.animation === 'spin' && (
+      {isBackdrop && (
         <span
-          className="absolute -inset-[3px] animate-spin rounded-md"
-          style={{ animationDuration: '3s', background: frame.spinBg }}
+          className={`absolute -inset-[3px] rounded-md af-${anim}`}
+          style={{ ...speedVar, background: frame.spinBg }}
           aria-hidden
         />
       )}
+      {/* Orbit: a rotating wrapper carrying a single dot on its top edge. */}
+      {anim === 'orbit' && (
+        <span
+          className="af-orbit pointer-events-none absolute -inset-[4px] rounded-full"
+          style={speedVar}
+          aria-hidden
+        >
+          <span
+            className={`absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full ${dotSizes[size]}`}
+            style={{
+              background: frame.orbitColor,
+              boxShadow: `0 0 6px ${frame.orbitColor}`,
+            }}
+          />
+        </span>
+      )}
       <span
-        className={`relative flex items-center justify-center overflow-hidden rounded-md border border-edge bg-panel-2 ${sizes[size]} ${frame.ringClass} ${
-          frame.animation === 'pulse' ? 'animate-pulse' : ''
-        }`}
+        className={`relative flex items-center justify-center overflow-hidden rounded-md border border-edge bg-panel-2 ${sizes[size]} ${frame.ringClass} ${boxAnim}`}
+        style={boxAnim ? speedVar : undefined}
         title={user?.displayName}
       >
         {isImage ? (

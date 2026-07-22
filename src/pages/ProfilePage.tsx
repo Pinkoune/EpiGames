@@ -1,14 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ProfileEditor } from '../components/auth/ProfileEditor'
 import { GameFormModal } from '../components/games/GameFormModal'
 import { GameCard } from '../components/library/GameCard'
 import { Avatar, SectionLabel, btnGhost, btnPrimary } from '../components/ui'
-import { backend } from '../lib/backend'
-import { useChatMap, useRequestsMap } from '../lib/hooks'
-import { resolveProfileBackground } from '../lib/profileCustomization'
+import { coverFallback } from '../lib/cover'
+import { useMetaProfile } from '../lib/hooks'
+import {
+  resolveProfileAccent,
+  resolveProfileBackground,
+  resolveProfileTitle,
+} from '../lib/profileCustomization'
 import { computeMetaAchievements } from '../lib/achievements'
-import type { Friendship, PlayEntry } from '../lib/types'
+import type { PlayEntry } from '../lib/types'
 import { PORTAL_SCOPE, friendshipId, isRequestClosed } from '../lib/types'
 import { useAuthStore } from '../stores/authStore'
 import { useFriendsStore } from '../stores/friendsStore'
@@ -50,32 +54,13 @@ export function ProfilePage() {
 
   const [editing, setEditing] = useState(false)
   const [publishing, setPublishing] = useState(false)
-  const [theirFriendships, setTheirFriendships] = useState<Friendship[]>([])
-  const [plays, setPlays] = useState<PlayEntry[]>([])
 
   const profile = uid ? users[uid] : undefined
   const isSelf = Boolean(me && uid && me.uid === uid)
 
-  // Friend count of the viewed profile (accepted only).
-  useEffect(() => {
-    if (!uid) return
-    setTheirFriendships([])
-    return backend.watchFriendships(uid, setTheirFriendships)
-  }, [uid])
-
-  // Recent launch history of the viewed profile.
-  useEffect(() => {
-    if (!uid) return
-    setPlays([])
-    return backend.watchPlays(uid, setPlays)
-  }, [uid])
-
-  const scopeIds = useMemo(
-    () => [PORTAL_SCOPE, ...games.map((g) => g.id)],
-    [games],
-  )
-  const requestsMap = useRequestsMap(scopeIds)
-  const chatMap = useChatMap(scopeIds)
+  // Everything the badges and activity lists derive from (shared with the
+  // profile editor, which uses the same stats to gate earned titles).
+  const { stats, requests: theirRequests, plays } = useMetaProfile(uid, games)
 
   if (!uid || !profile) {
     return (
@@ -94,37 +79,26 @@ export function ProfilePage() {
   const ownedGames = games.filter(
     (g) => g.ownerUids.includes(uid) && !g.archived && canSeeGame(me, g),
   )
-  const publishedCount = ownedGames.filter((g) => g.approved).length
 
-  const allRequests = Object.values(requestsMap).flat()
-  const theirRequests = allRequests.filter((r) => r.authorUid === uid)
-  const upvotesReceived = theirRequests.reduce(
-    (sum, r) => sum + Object.keys(r.upvotes).length,
-    0,
+  const achievements = computeMetaAchievements(stats).sort(
+    (a, b) => Number(b.earned) - Number(a.earned),
   )
-  const messagesSent = Object.values(chatMap)
-    .flat()
-    .filter((m) => m.authorUid === uid).length
-  const friendsCount = theirFriendships.filter((f) => f.status === 'accepted').length
-
-  const achievements = computeMetaAchievements({
-    publishedGames: publishedCount,
-    bugsReported: theirRequests.filter((r) => r.type === 'bug').length,
-    featuresReported: theirRequests.filter((r) => r.type === 'feature').length,
-    upvotesReceived,
-    friends: friendsCount,
-    messages: messagesSent,
-    distinctGamesPlayed: new Set(plays.map((p) => p.gameId)).size,
-    totalPlays: plays.length,
-  }).sort((a, b) => Number(b.earned) - Number(a.earned))
   const earnedCount = achievements.filter((a) => a.earned).length
 
   const relation = me ? myFriendships.find((f) => f.id === friendshipId(me.uid, uid)) : undefined
 
   const backgroundCss = resolveProfileBackground(profile.profileBackground)
+  const title = resolveProfileTitle(profile.profileTitle)
+  const accent = resolveProfileAccent(profile.profileAccent)
+  // Overriding the theme variable re-themes every `text-accent` / `bg-accent`
+  // inside this subtree at once — no per-element color plumbing.
+  const accentStyle = accent ? ({ '--color-accent': accent } as CSSProperties) : undefined
+  const favoriteGame = profile.favoriteGameId
+    ? games.find((g) => g.id === profile.favoriteGameId && canSeeGame(me, g))
+    : undefined
 
   return (
-    <div className="relative z-10 mx-auto max-w-4xl">
+    <div className="relative z-10 mx-auto max-w-4xl" style={accentStyle}>
       {/*
         Steam-style: the chosen background themes the whole profile page.
         The root div above (`relative z-10`) establishes its OWN stacking
@@ -159,6 +133,9 @@ export function ProfilePage() {
               </span>
             )}
           </div>
+          {title && (
+            <p className="mt-0.5 text-sm font-medium tracking-wide text-accent">« {title} »</p>
+          )}
           <p className="mt-0.5 text-sm text-ink-dim">
             {playing ? (
               <Link
@@ -206,12 +183,41 @@ export function ProfilePage() {
 
       {/* Stats, Steam-style */}
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <StatTile value={publishedCount} label="jeux publiés" />
-        <StatTile value={messagesSent} label="messages envoyés" />
+        <StatTile value={stats.publishedGames} label="jeux publiés" />
+        <StatTile value={stats.messages} label="messages envoyés" />
         <StatTile value={theirRequests.length} label="bugs & features signalés" />
-        <StatTile value={upvotesReceived} label="upvotes reçus" />
-        <StatTile value={friendsCount} label="amis" />
+        <StatTile value={stats.upvotesReceived} label="upvotes reçus" />
+        <StatTile value={stats.friends} label="amis" />
       </div>
+
+      {/* Showcase — one pinned game, Steam's "featured" slot. */}
+      {favoriteGame && (
+        <section className="mt-8">
+          <SectionLabel>Jeu vitrine</SectionLabel>
+          <Link
+            to={`/game/${favoriteGame.id}`}
+            className="flex items-center gap-4 overflow-hidden rounded-lg border border-accent/30 bg-gradient-to-r from-accent/10 to-panel p-4 transition hover:border-accent/60"
+          >
+            <div
+              className="hidden aspect-video w-40 shrink-0 rounded-md border border-edge bg-cover bg-center sm:block"
+              style={
+                favoriteGame.coverUrl
+                  ? { backgroundImage: `url(${favoriteGame.coverUrl})` }
+                  : { background: coverFallback(favoriteGame.id) }
+              }
+            />
+            <div className="min-w-0">
+              <p className="font-display text-lg font-bold">{favoriteGame.title}</p>
+              {favoriteGame.tagline && (
+                <p className="mt-0.5 line-clamp-2 text-sm text-ink-dim">
+                  {favoriteGame.tagline}
+                </p>
+              )}
+              <p className="mt-1.5 text-xs text-accent">Le coup de cœur de {profile.displayName} →</p>
+            </div>
+          </Link>
+        </section>
+      )}
 
       {/* Achievements — portal meta-badges, computed live from the data above */}
       <section className="mt-8">

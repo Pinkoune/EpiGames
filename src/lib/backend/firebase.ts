@@ -38,6 +38,7 @@ import type {
   AchievementStatus,
   ChatMessage,
   Friendship,
+  EditableProfile,
   Game,
   GameAchievement,
   GameRequest,
@@ -114,6 +115,9 @@ export class FirebaseBackend implements Backend {
       linkedUids: [],
       profileFrame: 'none',
       profileBackground: 'none',
+      profileTitle: 'none',
+      profileAccent: 'default',
+      favoriteGameId: '',
     }
     await setDoc(userRef, profile)
   }
@@ -135,6 +139,9 @@ export class FirebaseBackend implements Backend {
       linkedUids: [],
       profileFrame: 'none',
       profileBackground: 'none',
+      profileTitle: 'none',
+      profileAccent: 'default',
+      favoriteGameId: '',
     }
     await setDoc(userRef, profile)
   }
@@ -153,12 +160,7 @@ export class FirebaseBackend implements Backend {
     await fbSignOut(this.auth)
   }
 
-  async updateProfile(
-    uid: string,
-    patch: Partial<
-      Pick<UserProfile, 'displayName' | 'avatar' | 'bio' | 'profileFrame' | 'profileBackground'>
-    >,
-  ): Promise<void> {
+  async updateProfile(uid: string, patch: Partial<EditableProfile>): Promise<void> {
     await updateDoc(doc(this.db, 'users', uid), patch)
   }
 
