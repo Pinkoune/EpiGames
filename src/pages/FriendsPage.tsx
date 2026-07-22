@@ -220,9 +220,14 @@ export function FriendsPage() {
         )}
 
         <section>
-          <h2 className="mb-2 text-sm font-bold tracking-wide text-ink-dim uppercase">
+          <h2 className="text-sm font-bold tracking-wide text-ink-dim uppercase">
             Mes amis ({friendUids.length})
           </h2>
+          {friendUids.length > 0 && (
+            <p className="mb-2 text-xs text-ink-dim/70">
+              Clique sur un ami pour lui écrire en privé 💬
+            </p>
+          )}
           {sortedFriends.length === 0 ? (
             <p className="rounded-lg border border-dashed border-edge p-4 text-center text-sm text-ink-dim">
               Pas encore d'amis — ajoute quelqu'un depuis la liste des membres, en
@@ -264,9 +269,20 @@ export function FriendsPage() {
                               : 'Hors ligne'}
                       </span>
                     </span>
-                    {dm && dm.unread > 0 && (
+                    {/* Always show the "write to them" affordance, so the row
+                        never reads as a plain directory entry. */}
+                    {dm && dm.unread > 0 ? (
                       <span className="shrink-0 rounded-full bg-accent px-1.5 text-xs font-bold text-abyss">
                         {dm.unread}
+                      </span>
+                    ) : (
+                      <span
+                        className={`shrink-0 text-sm transition ${
+                          active ? 'text-accent' : 'text-ink-dim/40'
+                        }`}
+                        title="Ouvrir la conversation"
+                      >
+                        💬
                       </span>
                     )}
                   </button>

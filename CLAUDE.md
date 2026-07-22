@@ -176,6 +176,15 @@ externes ne peuvent pas l'être). Chaque `setPlaying(non-null)` logge une entré
 `plays` (historique). Notifications légères : cloche topbar (`NotificationsBell`)
 100 % dérivée des stores (demandes d'ami, nouveaux jeux non vus, MAJ non vues,
 amis en jeu), sans stockage dédié.
+- **Bulles de notif façon console** (`stores/toastStore.ts` + `components/layout/Toasts.tsx`,
+  alimentées par `lib/useFriendEvents.ts` monté dans Shell) : bulles TEMPORAIRES
+  (6 s, 3 max) quand un ami se connecte, lance un jeu, écrit un MP ou envoie une
+  invitation, et à la réception d'une demande d'ami. Volontairement NON persistées
+  — la cloche reste le digest durable, la bulle est le signal sur l'instant.
+  ⚠️ Le piège est de ne PAS spammer au chargement : les stores se remplissent en
+  plusieurs snapshots, donc `useFriendEvents` combine (1) une période de silence
+  de 4 s après le montage, (2) des baselines par source capturées au 1er passage,
+  (3) pour les MP, un filtre `createdAt > montage` + dédup par id de message.
 - **Nouveaux jeux** : `hasUnseenNewGame` (types.ts) réutilise le champ
   `seenUpdates` existant (pas de nouveau champ) — un jeu approuvé publié il y a
   moins de 14 j (`NEW_GAME_WINDOW_MS`) et non vu affiche un badge « NOUVEAU »

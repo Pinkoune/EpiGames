@@ -302,11 +302,14 @@ service cloud.firestore {
         return signedIn() && request.auth.uid in resource.data.users;
       }
 
-      // A signed-in user may read a pair doc they're part of — and also a
-      // NON-EXISTENT one (resource == null), so the existence check in
-      // sendFriendRequest doesn't hit "insufficient permissions" before the
-      // friendship is created. A missing doc leaks nothing.
-      allow read: if signedIn() && (resource == null || involvesMe());
+      // Readable by any member, like users/games/plays/requests: the friend
+      // graph isn't secret in a small trusted group, and profiles show
+      // someone else's friend COUNT. It also has to be this way technically —
+      // watchFriendships queries `users array-contains <uid>`, and a query
+      // whose results aren't provably readable is rejected WHOLE, so
+      // restricting reads to `involvesMe()` broke every other member's
+      // profile with permission-denied. Writes stay strict (below).
+      allow read: if signedIn();
 
       allow create: if signedIn()
         && request.resource.data.users.size() == 2

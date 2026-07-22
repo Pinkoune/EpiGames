@@ -88,6 +88,17 @@ button:disabled {
   }
 }
 
+/* Console-style notification bubbles (see components/layout/Toasts.tsx). */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(1.25rem) scale(0.97); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+.toast-in { animation: toast-in 0.22s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-in { animation: none; }
+}
+
 /* Markdown content (game/request descriptions) */
 .md { line-height: 1.65; }
 .md > * + * { margin-top: 0.75em; }

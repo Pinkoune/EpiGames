@@ -3,12 +3,14 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { Logo } from '../Logo'
 import { backend } from '../../lib/backend'
 import { usePresenceAutoAway } from '../../lib/usePresenceAutoAway'
+import { useFriendEvents } from '../../lib/useFriendEvents'
 import { useAuthStore } from '../../stores/authStore'
 import { useFriendsStore, friendUidsOf, pendingIncoming } from '../../stores/friendsStore'
 import { useGamesStore } from '../../stores/gamesStore'
 import { usePresenceStore } from '../../stores/presenceStore'
 import { ProfileEditor } from '../auth/ProfileEditor'
 import { NotificationsBell } from './NotificationsBell'
+import { Toasts } from './Toasts'
 import { Avatar } from '../ui'
 
 const navCls = ({ isActive }: { isActive: boolean }) =>
@@ -37,6 +39,8 @@ export function Shell() {
 
   // Self-correcting "en jeu": clears the status on prolonged inactivity.
   usePresenceAutoAway(user?.uid)
+  // Turns friend activity (online, playing, DMs, invites) into toast bubbles.
+  useFriendEvents()
 
   const myPlaying = user ? (presence[user.uid]?.playing ?? null) : null
 
@@ -217,6 +221,8 @@ export function Shell() {
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:py-8">
         <Outlet />
       </main>
+
+      <Toasts />
 
       {editingProfile && <ProfileEditor onClose={() => setEditingProfile(false)} />}
     </div>
